@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "Cogswell.io Pub/Sub is not yet implemented."
+exit 1
