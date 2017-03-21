@@ -1,0 +1,23 @@
+{
+  "name": "dslink-scala-cogswell-pubsub",
+  "version": "1.0.0",
+  "description": "Cogswell.io Pub/Sub DSLink",
+  "license": "Apache"
+  "author": {
+    "name": "Aviata, Inc.",
+    "email": "support@cogswell.io"
+  },
+  "main": "bin/dslink-scala-cogswell-pubsub",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cogswell-io/dsa-dslink-scala-cogs-pubsub"
+  },
+  "bugs": {
+  	"url": "https://github.com/cogswell-io/dsa-dslink-scala-cogs-pubsub/issues"
+  },
+  "configs": {
+    "broker": {
+      "type": "url"
+    }
+  }
+}
