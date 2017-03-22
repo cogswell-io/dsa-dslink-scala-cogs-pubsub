@@ -1,6 +1,8 @@
 
 name := """dslink-scala-cogswell-pubsub"""
 
+organization := "io.cogswell"
+
 version := "1.0.0"
 
 scalaVersion := "2.11.7"
