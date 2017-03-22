@@ -8,12 +8,19 @@ import org.dsa.iot.dslink.node.value.Value
 import org.dsa.iot.dslink.node.value.ValueType
 import org.slf4j.LoggerFactory
 import scala.util.Random
+import java.util.Objects
+import java.util.TimerTask
+import java.util.Timer
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.Duration
+
+
 
 object Main extends DSLinkHandler {
   private val logger = LoggerFactory.getLogger(getClass)
 
   override val isResponder = true
-  override def isRequester() = false
+  override val isRequester = true
 
 // General handlers
   
@@ -59,6 +66,27 @@ object Main extends DSLinkHandler {
   }
   */
   
+  private val scheduler = new Timer
+  
+  def task(action: => Unit): TimerTask = {
+    new TimerTask {
+      override def run(): Unit = action
+    }
+  }
+  
+  def schedule(delay: Duration, action: => Unit): Unit = {
+    scheduler.schedule(task(action), delay.toMillis)
+  }
+  
+  def repeat(interval: Duration)(action: => Unit): Unit = {
+    def doAgain: Unit = {
+      action
+      schedule(interval, doAgain)
+    }
+    
+    doAgain
+  }
+  
   // Handle initialization of the Responder
   override def onResponderInitialized(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' has been initialized")
@@ -66,14 +94,16 @@ object Main extends DSLinkHandler {
     val CHILD_NAME = "RandomNumbers"
     val CHILD_TITLE = "Random Numbers"
     
-    link.getNodeManager.getSuperRoot
+    val node = link.getNodeManager.getSuperRoot
       .createChild(CHILD_NAME)
       .setDisplayName(CHILD_TITLE)
       .setValueType(VALUE_TYPE)
-      .setValue(new Value(0) {
-        override def getType(): ValueType = VALUE_TYPE
-        override def getNumber() = Random.nextDouble()
-      })
+      .setValue(new Value(Random.nextDouble()))
+      .build()
+    
+    repeat(Duration(500, TimeUnit.MILLISECONDS)) {
+      node.setValue(new Value(Random.nextDouble()))
+    }
   }
   
   // Handle connection of the Responder (happens after initialization)
