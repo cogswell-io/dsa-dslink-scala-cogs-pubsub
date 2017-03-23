@@ -7,3 +7,6 @@
 /.classpath
 /.settings/
 /deploy/
+/.cache-*
+/bin/io
+/bin/*.class
