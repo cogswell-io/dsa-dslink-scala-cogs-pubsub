@@ -13,14 +13,17 @@ import java.util.TimerTask
 import java.util.Timer
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+import io.cogswell.dslink.pubsub.util.Scheduler
 
 
 
 object Main extends DSLinkHandler {
   private val logger = LoggerFactory.getLogger(getClass)
 
+  private var rootNode: Node = _
+
   override val isResponder = true
-  override val isRequester = true
+  override val isRequester = false
 
 // General handlers
   
@@ -33,17 +36,17 @@ object Main extends DSLinkHandler {
   /*
   override def onSubscriptionFail(path: String): Node = {
     logger.info(s"Subscription failed to path '${path}'")
+    rootNode
   }
-  * 
-  */
+  // */
   
   // Handle a failed invocation operation
   /*
   override def onInvocationFail(path: String): Node = {
     logger.info(s"Invocation failed for path '${path}'")
+    rootNode
   }
-  * 
-  */
+  // */
   
 // Responder handlers
   
@@ -66,27 +69,6 @@ object Main extends DSLinkHandler {
   }
   */
   
-  private val scheduler = new Timer
-  
-  def task(action: => Unit): TimerTask = {
-    new TimerTask {
-      override def run(): Unit = action
-    }
-  }
-  
-  def schedule(delay: Duration, action: => Unit): Unit = {
-    scheduler.schedule(task(action), delay.toMillis)
-  }
-  
-  def repeat(interval: Duration)(action: => Unit): Unit = {
-    def doAgain: Unit = {
-      action
-      schedule(interval, doAgain)
-    }
-    
-    doAgain
-  }
-  
   // Handle initialization of the Responder
   override def onResponderInitialized(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' has been initialized")
@@ -94,15 +76,15 @@ object Main extends DSLinkHandler {
     val CHILD_NAME = "RandomNumbers"
     val CHILD_TITLE = "Random Numbers"
     
-    val node = link.getNodeManager.getSuperRoot
+    rootNode = link.getNodeManager.getSuperRoot
       .createChild(CHILD_NAME)
       .setDisplayName(CHILD_TITLE)
       .setValueType(VALUE_TYPE)
       .setValue(new Value(Random.nextDouble()))
       .build()
     
-    repeat(Duration(500, TimeUnit.MILLISECONDS)) {
-      node.setValue(new Value(Random.nextDouble()))
+    Scheduler.repeat(Duration(500, TimeUnit.MILLISECONDS)) {
+      rootNode.setValue(new Value(Random.nextDouble()))
     }
   }
   
