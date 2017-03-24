@@ -1,4 +1,4 @@
-package io.cogswell.dslink.pubsub.publisher
+package io.cogswell.dslink.pubsub.subscriber
 
 import java.util.UUID
 
@@ -6,11 +6,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
 
-case class TestPubSubPublisher(
+case class LocalPubSubSubscriber(
     connection: PubSubConnection,
     channelName: String
-) extends PubSubPublisher {
+) extends PubSubSubscriber {
   override def channel: String = channelName
+
+  override def unsubscribe()(implicit ec: ExecutionContext): Future[Unit] = {
+    Future.successful(Unit)
+  }
 
   override def publish(
       message: String

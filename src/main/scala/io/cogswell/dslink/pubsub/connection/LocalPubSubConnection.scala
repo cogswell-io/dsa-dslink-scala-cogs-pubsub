@@ -13,10 +13,10 @@ import org.joda.time.DateTime
 import io.cogswell.dslink.pubsub.model.PubSubMessage
 import io.cogswell.dslink.pubsub.model.PubSubOptions
 import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
-import io.cogswell.dslink.pubsub.subscriber.TestPubSubSubscriber
+import io.cogswell.dslink.pubsub.subscriber.LocalPubSubSubscriber
 import io.cogswell.dslink.pubsub.util.Uuid
 
-case class TestPubSubConnection(
+case class LocalPubSubConnection(
     options: Option[PubSubOptions]
 ) extends PubSubConnection {
   type MessageListener = (PubSubMessage) => Unit
@@ -33,7 +33,7 @@ case class TestPubSubConnection(
   )(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
     messageListener.foreach(subscribers.addBinding(channel, _))
 
-    Future.successful(TestPubSubSubscriber(this, channel))
+    Future.successful(LocalPubSubSubscriber(this, channel))
   }
 
   override def unsubscribe(
