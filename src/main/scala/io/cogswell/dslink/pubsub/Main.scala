@@ -76,6 +76,8 @@ object Main extends DSLinkHandler {
     val CHILD_NAME = "RandomNumbers"
     val CHILD_TITLE = "Random Numbers"
     
+    val pubsubRoot = PubSubRootNode(link)
+    
     rootNode = link.getNodeManager.getSuperRoot
       .createChild(CHILD_NAME)
       .setDisplayName(CHILD_TITLE)
