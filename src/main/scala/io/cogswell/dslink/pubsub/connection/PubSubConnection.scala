@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import java.util.UUID
 import io.cogswell.dslink.pubsub.model.PubSubMessage
-import io.cogswell.dslink.pubsub.subscription.PubSubSubscription
+import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
 
 trait PubSubConnection {
   /**
@@ -25,7 +25,7 @@ trait PubSubConnection {
   def subscribe(
       channel: String, 
       messageListener: Option[(PubSubMessage) => Unit] = None
-  )(implicit ec: ExecutionContext): Future[PubSubSubscription]
+  )(implicit ec: ExecutionContext): Future[PubSubSubscriber]
 
   /**
    * Unsubscribe from a pub/sub channel.

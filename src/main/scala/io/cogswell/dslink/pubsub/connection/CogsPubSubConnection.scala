@@ -1,13 +1,16 @@
 package io.cogswell.dslink.pubsub.connection
 
+import java.util.UUID
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+
 import com.gambit.sdk.pubsub.PubSubHandle
-import io.cogswell.dslink.pubsub.util.Futures
-import java.util.UUID
+
 import io.cogswell.dslink.pubsub.model.PubSubMessage
-import io.cogswell.dslink.pubsub.subscription.PubSubSubscription
-import io.cogswell.dslink.pubsub.subscription.CogsPubSubSubscription
+import io.cogswell.dslink.pubsub.subscriber.CogsPubSubSubscriber
+import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
+import io.cogswell.dslink.pubsub.util.Futures
 
 case class CogsPubSubConnection(
     pubSubHandle: PubSubHandle
@@ -19,9 +22,9 @@ case class CogsPubSubConnection(
   override def subscribe(
       channel: String,
       messageListener: Option[(PubSubMessage) => Unit]
-  )(implicit ec: ExecutionContext): Future[PubSubSubscription] = {
+  )(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
     Futures.convert(pubSubHandle.subscribe(channel, null)) map { _ =>
-      CogsPubSubSubscription(this, channel)
+      CogsPubSubSubscriber(this, channel)
     }
   }
 

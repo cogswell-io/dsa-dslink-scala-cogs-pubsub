@@ -12,6 +12,6 @@ object ServicesModule extends Module {
 
   // Environment-specific bindings
 
-  bind [PubSubService] when (inTest) to TestPubSubService
+  bind [PubSubService] when (inTest) to LocalPubSubService
   bind [PubSubService] when (inProd) to CogsPubSubService
 }
