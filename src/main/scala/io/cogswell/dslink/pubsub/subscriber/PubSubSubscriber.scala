@@ -1,12 +1,12 @@
-package io.cogswell.dslink.pubsub.subscription
+package io.cogswell.dslink.pubsub.subscriber
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import java.util.UUID
 
-trait PubSubSubscription {
+trait PubSubSubscriber {
   /**
-   * Supplies the channel of this subscription.
+   * Supplies the channel of this subscriber.
    * 
    * @return the channel
    */
@@ -20,7 +20,7 @@ trait PubSubSubscription {
   def unsubscribe()(implicit ec: ExecutionContext): Future[Unit]
 
   /**
-   * Publishes a message to this subscription's channel.
+   * Publishes a message to this subscriber's channel.
    * 
    * @param message the message to publish
    * 
