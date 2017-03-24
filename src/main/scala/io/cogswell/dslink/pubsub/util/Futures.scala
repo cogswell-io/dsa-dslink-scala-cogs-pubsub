@@ -19,7 +19,10 @@ object Futures {
     override def execute(runnable: Runnable): Unit = ec.execute(runnable)
   }
   
-  private def biConsumer[A, B](consumeA: (A) => Unit, consumeB: (B) => Unit): BiConsumer[A, B] = new BiConsumer[A, B] {
+  private def biConsumer[A, B](
+      consumeA: (A) => Unit,
+      consumeB: (B) => Unit
+  ): BiConsumer[A, B] = new BiConsumer[A, B] {
     override def accept(a: A, b: B): Unit = {
       if (a != null) consumeA(a)
       if (b != null) consumeB(b)
@@ -65,7 +68,7 @@ object Futures {
           case e: Throwable => promise.failure(e)
         }
       }
-    } , executor(ec))
+    }, executor(ec))
     
     promise.future
   }
