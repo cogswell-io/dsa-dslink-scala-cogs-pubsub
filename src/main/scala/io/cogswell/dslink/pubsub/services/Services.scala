@@ -10,6 +10,8 @@ object Services {
   private var customInjector: Option[Injector] = None
   private var customServiceProvider: Option[ServiceProvider] = None
   
+  def serviceInjector: Injector = injector
+  
   def useCustomInjector(injector: Injector): Unit = {
     customInjector = Some(injector)
     customServiceProvider = Some(new ServiceProvider()(injector))

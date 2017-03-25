@@ -5,10 +5,19 @@ import scaldi.Condition
 import scala.util.Properties
 
 object ServicesModule extends Module {
-  private lazy val mode: String = Properties.envOrElse("DSLINK_RUN_MODE", "production")
-
-  def inTest(): Condition = Condition("dev".equals(mode))
-  def inProd(): Condition = !inTest()
+  val RUN_MODE_KEY = "io.cogswell.dslink.pubsub.RunMode"
+  
+  def setTestMode(): Unit = Properties.setProp(RUN_MODE_KEY, TestMode.modeName)
+  def setProductionMode(): Unit = Properties.setProp(RUN_MODE_KEY, ProductionMode.modeName)
+  
+  def runMode: RunMode = {
+    RunMode.forName(
+      Properties.propOrElse(RUN_MODE_KEY, ProductionMode.modeName)
+    ) getOrElse ProductionMode
+  }
+  
+  def inTest(): Condition = Condition(TestMode == runMode)
+  def inProd(): Condition = Condition(ProductionMode == runMode)
 
   // Environment-specific bindings
 
