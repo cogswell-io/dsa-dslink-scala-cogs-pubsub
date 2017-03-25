@@ -48,6 +48,8 @@ case class PubSubConnectionNode(
     // Disconnect action node
     val disconnectNode = connectionNode.createChild("Disconnect")
       .setAction(LinkUtils.action(Seq()) { actionData =>
+        logger.info(s"Closing connection '$name'")
+        parentNode.removeChild(connectionNode)
         connection.foreach(_.disconnect())
       })
       .build()
@@ -59,8 +61,11 @@ case class PubSubConnectionNode(
       )) { actionData =>
         val map = actionData.dataMap
         map(CHANNEL_PARAM).value.map(_.getString) match {
-          case None => // TODO: handle missing channel
           case Some(channel) => addSubscriber(connectionNode, channel)
+          case None => {
+            logger.warn(s"No channel supplied for new subscriber.")
+            // TODO: handle missing channel
+          }
         }
       })
       .build()
@@ -72,8 +77,11 @@ case class PubSubConnectionNode(
       )) { actionData =>
         val map = actionData.dataMap
         map(CHANNEL_PARAM).value.map(_.getString) match {
-          case None => // TODO: handle missing channel
           case Some(channel) => addPublisher(connectionNode, channel)
+          case None => {
+            logger.warn(s"No channel supplied for new publisher.")
+            // TODO: handle missing channel
+          }
         }
       })
       .build()
@@ -81,21 +89,25 @@ case class PubSubConnectionNode(
 
   initUi()
   
-  def addSubscriber(parentNode: Node, channel: String): Unit = {
+  private def addSubscriber(parentNode: Node, channel: String): Unit = {
+    logger.info(s"Adding subscriber to channel '$channel'")
+    
     connection match {
       case None => // TODO: handle no connection
-      case Some(c) => {
-        val subscriber = PubSubSubscriberNode(manager, parentNode, c, channel)
+      case Some(conn) => {
+        val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
         subscribers(channel) = subscriber
       }
     }
   }
   
-  def addPublisher(parentNode: Node, channel: String): Unit = {
+  private def addPublisher(parentNode: Node, channel: String): Unit = {
+    logger.info(s"Adding publisher for channel '$channel'")
+    
     connection match {
       case None => // TODO: handle no connection
-      case Some(c) => {
-        val publisher = PubSubPublisherNode(manager, parentNode, c, channel)
+      case Some(conn) => {
+        val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
         publishers(channel) = publisher
       }
     }

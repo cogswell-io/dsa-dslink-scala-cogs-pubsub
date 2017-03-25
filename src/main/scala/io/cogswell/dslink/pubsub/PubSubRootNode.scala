@@ -32,16 +32,16 @@ case class PubSubRootNode(
 
   private def initUi(): Unit = {
     // Random number generator
-    link.getNodeManager.getSuperRoot
+    val randNode = link.getNodeManager.getSuperRoot
       .createChild("RandomNumbers")
-      .setHidden(true)
+      //.setHidden(true)
       .setDisplayName("Random Numbers")
       .setValueType(ValueType.NUMBER)
       .setValue(new Value(Random.nextDouble()))
       .build()
     
     Scheduler.repeat(Duration(500, TimeUnit.MILLISECONDS)) {
-      rootNode.setValue(new Value(Random.nextDouble()))
+      randNode.setValue(new Value(Random.nextDouble()))
     }
     
     // Connect action

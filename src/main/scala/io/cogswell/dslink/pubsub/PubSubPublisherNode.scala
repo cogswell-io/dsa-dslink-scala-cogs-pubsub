@@ -9,6 +9,8 @@ import io.cogswell.dslink.pubsub.util.ActionParam
 import org.dsa.iot.dslink.node.value.ValueType
 import scala.concurrent.ExecutionContext
 import org.slf4j.LoggerFactory
+import org.dsa.iot.dslink.node.Writable
+import io.cogswell.dslink.pubsub.model.PubSubMessage
 
 case class PubSubPublisherNode(
     manager: NodeManager,
@@ -17,18 +19,30 @@ case class PubSubPublisherNode(
     channel: String
 )(implicit ec: ExecutionContext) {
   private val logger = LoggerFactory.getLogger(getClass)
+  private val messageSink: (String) => Unit = { message =>
+    connection.publish(channel, message)
+  }
   
   private def initUi(): Unit = {
     val MESSAGE_PARAM = "channel"
-    val nodeName = s"publisher:${channel}"
+    val nodeName = s"publisher:$channel"
+    val nodeAlias = s"Publisher [$channel]"
     
     // Connection node
-    val publisherNode = parentNode.createChild(nodeName).build()
+    val publisherNode = parentNode
+      .createChild(nodeName)
+      .setDisplayName(nodeAlias)
+      .setWritable(Writable.WRITE)
+      .setValueType(ValueType.STRING)
+      .build()
+      
+      // TODO: listen for changes to the node's value, and publish when it changes
+      //publishNode.setValue(value, externalSource)
     
     // Disconnect action node
     val removeNode = publisherNode.createChild("Remove")
       .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Removing subscriber for channel '${channel}'")
+        logger.info(s"Removing subscriber for channel '$channel'")
         parentNode.removeChild(publisherNode)
       })
       .build()

@@ -12,6 +12,9 @@ import org.slf4j.LoggerFactory
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.ActionParam
 import org.dsa.iot.dslink.node.value.ValueType
+import org.dsa.iot.dslink.node.Writable
+import io.cogswell.dslink.pubsub.model.PubSubMessage
+import org.dsa.iot.dslink.node.value.Value
 
 case class PubSubSubscriberNode(
     manager: NodeManager,
@@ -20,18 +23,29 @@ case class PubSubSubscriberNode(
     channel: String
 )(implicit ec: ExecutionContext) {
   private val logger = LoggerFactory.getLogger(getClass)
+  private var messageSource: Option[(PubSubMessage) => Unit] = None
   
   private def initUi(): Unit = {
     val MESSAGE_PARAM = "channel"
-    val nodeName = s"subscriber:${channel}"
+    val nodeName = s"subscriber:$channel"
+    val nodeAlias = s"Subscriber [$channel]"
     
     // Connection node
-    val subscriberNode = parentNode.createChild(nodeName).build()
+    val subscriberNode = parentNode
+      .createChild(nodeName)
+      .setDisplayName(nodeAlias)
+      .setWritable(Writable.NEVER)
+      .setValueType(ValueType.STRING)
+      .build()
+      
+    messageSource = Some({ msg =>
+      subscriberNode.setValue(new Value(msg.message), true)
+    })
     
     // Disconnect action node
     val removeNode = subscriberNode.createChild("Remove")
       .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Removing subscriber for channel '${channel}'")
+        logger.info(s"Removing subscriber for channel '$channel'")
         parentNode.removeChild(subscriberNode)
       })
       .build()
@@ -53,6 +67,8 @@ case class PubSubSubscriberNode(
   initUi()
   
   def subscribe()(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
-    connection.subscribe(channel, None)
+    connection.subscribe(channel, Some({ msg =>
+      messageSource.foreach(_(msg))
+    }))
   }
 }
