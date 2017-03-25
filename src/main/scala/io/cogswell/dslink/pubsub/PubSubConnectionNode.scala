@@ -17,6 +17,9 @@ import org.slf4j.LoggerFactory
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
 import io.cogswell.dslink.pubsub.services.Services
 import io.cogswell.dslink.pubsub.model.PubSubOptions
+import io.cogswell.dslink.pubsub.util.LinkUtils
+import io.cogswell.dslink.pubsub.util.ActionParam
+import scala.collection.mutable.{Map => MutableMap}
 
 case class PubSubConnectionNode(
     manager: NodeManager,
@@ -26,7 +29,10 @@ case class PubSubConnectionNode(
     writeKey: Option[String] = None,
     adminKey: Option[String] = None,
     url: Option[String] = None
-) {
+)(implicit ec: ExecutionContext) {
+  private val subscribers = MutableMap[String, PubSubSubscriberNode]()
+  private val publishers = MutableMap[String, PubSubPublisherNode]()
+  
   private def options: Option[PubSubOptions] = url.map(u => PubSubOptions(url = u))
   private val keys: Seq[String] = Seq(readKey, writeKey, writeKey).filter(_.isDefined).map(_.get)
   private var connection: Option[PubSubConnection] = None
@@ -34,26 +40,66 @@ case class PubSubConnectionNode(
   private val logger = LoggerFactory.getLogger(getClass)
 
   private def initUi(): Unit = {
-    def handle(event: ActionResult) = {
-      logger.info(s"Clicked Invoke to Create a Do Something")
-    }
+    val CHANNEL_PARAM = "channel"
     
-    val action = new Action(Permission.WRITE, new Handler[ActionResult] { def handle(event: ActionResult) {}})
-    /*  .addParameter(new Parameter(HOST_PARAMETER, ValueType.STRING, new Value("default_host")))
-      .addParameter(new Parameter(READKEY_PARAMETER, ValueType.STRING))
-      .addParameter(new Parameter(WRITEKEY_PARAMETER, ValueType.STRING))
-      .addParameter(new Parameter(ADMINKEY_PARAMETER, ValueType.STRING))
-      .addParameter(new Parameter(NAME_PARAMETER, ValueType.STRING))*/
+    // Connection node
+    val connectionNode = parentNode.createChild(name).build()
     
-    val connectNode = parentNode
-      .createChild(name)
-      .setDisplayName(name)
-      .setAction(action)
+    // Disconnect action node
+    val disconnectNode = connectionNode.createChild("Disconnect")
+      .setAction(LinkUtils.action(Seq()) { actionData =>
+        connection.foreach(_.disconnect())
+      })
       .build()
-
+    
+    // Subscribe action node
+    val subscribeNode = connectionNode.createChild("Subscribe")
+      .setAction(LinkUtils.action(Seq(
+          ActionParam(CHANNEL_PARAM, ValueType.STRING)
+      )) { actionData =>
+        val map = actionData.dataMap
+        map(CHANNEL_PARAM).value.map(_.getString) match {
+          case None => // TODO: handle missing channel
+          case Some(channel) => addSubscriber(connectionNode, channel)
+        }
+      })
+      .build()
+      
+    // Publisher action node
+    val publisherNode = connectionNode.createChild("Publish")
+      .setAction(LinkUtils.action(Seq(
+          ActionParam(CHANNEL_PARAM, ValueType.STRING)
+      )) { actionData =>
+        val map = actionData.dataMap
+        map(CHANNEL_PARAM).value.map(_.getString) match {
+          case None => // TODO: handle missing channel
+          case Some(channel) => addPublisher(connectionNode, channel)
+        }
+      })
+      .build()
   }
 
   initUi()
+  
+  def addSubscriber(parentNode: Node, channel: String): Unit = {
+    connection match {
+      case None => // TODO: handle no connection
+      case Some(c) => {
+        val subscriber = PubSubSubscriberNode(manager, parentNode, c, channel)
+        subscribers(channel) = subscriber
+      }
+    }
+  }
+  
+  def addPublisher(parentNode: Node, channel: String): Unit = {
+    connection match {
+      case None => // TODO: handle no connection
+      case Some(c) => {
+        val publisher = PubSubPublisherNode(manager, parentNode, c, channel)
+        publishers(channel) = publisher
+      }
+    }
+  }
   
   def connect()(implicit ec: ExecutionContext): Future[PubSubConnection] = {
     Services.pubSubService.connect(keys, options) map { conn =>

@@ -1,19 +1,16 @@
 package io.cogswell.dslink.pubsub
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.node.NodeManager
 
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
-import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
-import org.slf4j.LoggerFactory
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.ActionParam
 import org.dsa.iot.dslink.node.value.ValueType
+import scala.concurrent.ExecutionContext
+import org.slf4j.LoggerFactory
 
-case class PubSubSubscriberNode(
+case class PubSubPublisherNode(
     manager: NodeManager,
     parentNode: Node,
     connection: PubSubConnection,
@@ -23,21 +20,21 @@ case class PubSubSubscriberNode(
   
   private def initUi(): Unit = {
     val MESSAGE_PARAM = "channel"
-    val nodeName = s"subscriber:${channel}"
+    val nodeName = s"publisher:${channel}"
     
     // Connection node
-    val subscriberNode = parentNode.createChild(nodeName).build()
+    val publisherNode = parentNode.createChild(nodeName).build()
     
     // Disconnect action node
-    val removeNode = subscriberNode.createChild("Remove")
+    val removeNode = publisherNode.createChild("Remove")
       .setAction(LinkUtils.action(Seq()) { actionData =>
         logger.info(s"Removing subscriber for channel '${channel}'")
-        parentNode.removeChild(subscriberNode)
+        parentNode.removeChild(publisherNode)
       })
       .build()
     
-    // Subscriber action node
-    val publishNode = subscriberNode.createChild("Publish")
+    // Publisher action node
+    val publishNode = publisherNode.createChild("Publish")
       .setAction(LinkUtils.action(Seq(
           ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>
@@ -51,8 +48,4 @@ case class PubSubSubscriberNode(
   }
   
   initUi()
-  
-  def subscribe()(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
-    connection.subscribe(channel, None)
-  }
 }
