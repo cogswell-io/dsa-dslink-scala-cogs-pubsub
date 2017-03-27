@@ -31,7 +31,7 @@ class PubSubServiceTest extends DslinkTest(
     pubsub should be (LocalPubSubService)
   }
   
-  it should "connect" in {
+  it should "connect and supply a PubSubConnection" in {
     whenReady(Services.pubSubService.connect(noKeys, None)) { connection =>
       connection should be (LocalPubSubConnection(None))
     }
