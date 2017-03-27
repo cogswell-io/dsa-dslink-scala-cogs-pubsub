@@ -73,9 +73,9 @@ case class PubSubRootNode(
     val connectAction = LinkUtils.action(Seq(
         ActionParam(NAME_PARAM, ValueType.STRING),
         ActionParam(URL_PARAM, ValueType.STRING, Some(new Value("wss://api.cogswell.io/pubsub"))),
-        ActionParam(READ_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")),
-        ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")),
-        ActionParam(ADMIN_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))
+        ActionParam(READ_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))),
+        ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))),
+        ActionParam(ADMIN_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")))
     )) { actionData =>
       val map = actionData.dataMap
       
