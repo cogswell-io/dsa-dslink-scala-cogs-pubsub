@@ -43,7 +43,7 @@ class PubSubServiceTest extends DslinkTest(
     whenReady(
         Services.pubSubService.connect(noKeys, None) flatMap { _.disconnect }
     ) { result =>
-      result should be (Unit)
+      result should be (())
     }
   }
 }

@@ -21,6 +21,7 @@ import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.ActionParam
 import scala.collection.mutable.{Map => MutableMap}
 import scala.util.Failure
+import scala.util.Success
 
 case class PubSubConnectionNode(
     manager: NodeManager,
@@ -63,6 +64,7 @@ case class PubSubConnectionNode(
           ActionParam(CHANNEL_PARAM, ValueType.STRING)
       )) { actionData =>
         val map = actionData.dataMap
+        
         map(CHANNEL_PARAM).value.map(_.getString) match {
           case Some(channel) => addSubscriber(connectionNode, channel)
           case None => {
@@ -77,8 +79,10 @@ case class PubSubConnectionNode(
     val publisherNode = connectionNode.createChild("Publish")
       .setAction(LinkUtils.action(Seq(
           ActionParam(CHANNEL_PARAM, ValueType.STRING)
+          //ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>
         val map = actionData.dataMap
+
         map(CHANNEL_PARAM).value.map(_.getString) match {
           case Some(channel) => addPublisher(connectionNode, channel)
           case None => {
@@ -103,6 +107,11 @@ case class PubSubConnectionNode(
       case Some(conn) => {
         val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
         subscribers(channel) = subscriber
+        
+        subscriber.subscribe() andThen {
+          case Success(_) => logger.info(s"[$name] Succesfully subscribed to channel '$channel'")
+          case Failure(error) => logger.error(s"[$name] Error subscribing to channel '$channel':", error)
+        }
       }
     }
   }

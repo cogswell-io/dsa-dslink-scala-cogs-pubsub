@@ -28,7 +28,7 @@ case class PubSubSubscriberNode(
   private def initNode(): Unit = {
     logger.info(s"Initializing subscriber node for '$channel'")
     
-    val MESSAGE_PARAM = "channel"
+    val MESSAGE_PARAM = "message"
     val nodeName = s"subscriber:$channel"
     val nodeAlias = s"Subscriber [$channel]"
     
