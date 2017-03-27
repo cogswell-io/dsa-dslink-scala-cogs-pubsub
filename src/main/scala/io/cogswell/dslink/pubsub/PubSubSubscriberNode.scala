@@ -45,7 +45,7 @@ case class PubSubSubscriberNode(
     })
     
     // Disconnect action node
-    val removeNode = subscriberNode.createChild("Remove")
+    val removeNode = subscriberNode.createChild("Unsubscribe")
       .setAction(LinkUtils.action(Seq()) { actionData =>
         logger.info(s"Removing subscriber for channel '$channel'")
         // TODO: unsubscribe from pub/sub service
@@ -54,7 +54,7 @@ case class PubSubSubscriberNode(
       .build()
     
     // Subscriber action node
-    val publishNode = subscriberNode.createChild("Publish")
+    val publishNode = subscriberNode.createChild("Publish Message")
       .setAction(LinkUtils.action(Seq(
           ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>

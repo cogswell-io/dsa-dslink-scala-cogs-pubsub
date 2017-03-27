@@ -59,7 +59,7 @@ case class PubSubConnectionNode(
       .build()
     
     // Subscribe action node
-    val subscribeNode = connectionNode.createChild("Subscribe")
+    val subscribeNode = connectionNode.createChild("Add Subscribe")
       .setAction(LinkUtils.action(Seq(
           ActionParam(CHANNEL_PARAM, ValueType.STRING)
       )) { actionData =>
@@ -76,10 +76,9 @@ case class PubSubConnectionNode(
       .build()
       
     // Publisher action node
-    val publisherNode = connectionNode.createChild("Publish")
+    val publisherNode = connectionNode.createChild("Add Publisher")
       .setAction(LinkUtils.action(Seq(
           ActionParam(CHANNEL_PARAM, ValueType.STRING)
-          //ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>
         val map = actionData.dataMap
 

@@ -42,7 +42,7 @@ case class PubSubPublisherNode(
       //publishNode.setValue(value, externalSource)
     
     // Disconnect action node
-    val removeNode = publisherNode.createChild("Remove")
+    val removeNode = publisherNode.createChild("Remove Publisher")
       .setAction(LinkUtils.action(Seq()) { actionData =>
         logger.info(s"Removing subscriber for channel '$channel'")
         parentNode.removeChild(publisherNode)
@@ -50,7 +50,7 @@ case class PubSubPublisherNode(
       .build()
     
     // Publisher action node
-    val publishNode = publisherNode.createChild("Publish")
+    val publishNode = publisherNode.createChild("Publish Message")
       .setAction(LinkUtils.action(Seq(
           ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>

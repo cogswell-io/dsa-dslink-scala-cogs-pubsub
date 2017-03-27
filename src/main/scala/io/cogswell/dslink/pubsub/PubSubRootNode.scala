@@ -73,17 +73,17 @@ case class PubSubRootNode(
     val connectAction = LinkUtils.action(Seq(
         ActionParam(NAME_PARAM, ValueType.STRING),
         ActionParam(URL_PARAM, ValueType.STRING, Some(new Value("wss://api.cogswell.io/pubsub"))),
-        ActionParam(READ_KEY_PARAM, ValueType.STRING),
-        ActionParam(WRITE_KEY_PARAM, ValueType.STRING),
-        ActionParam(ADMIN_KEY_PARAM, ValueType.STRING)
+        ActionParam(READ_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")),
+        ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")),
+        ActionParam(ADMIN_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))
     )) { actionData =>
       val map = actionData.dataMap
       
       val name = map(NAME_PARAM).value.map(_.getString).getOrElse("")
       val url = map(URL_PARAM).value.map(_.getString)
-      val readKey = map(READ_KEY_PARAM).value.map(_.getString)
-      val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString)
-      val adminKey = map(ADMIN_KEY_PARAM).value.map(_.getString)
+      val readKey = map(READ_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
+      val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
+      val adminKey = map(ADMIN_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
       
       // TODO: ensure that the name is not empty, nor a duplicate
       // TODO: ensure that at least one key is supplied
