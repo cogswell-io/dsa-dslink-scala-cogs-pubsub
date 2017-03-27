@@ -1,21 +1,13 @@
 package io.cogswell.dslink.pubsub
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.DSLinkFactory
 import org.dsa.iot.dslink.DSLinkHandler
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.node.value.Value
-import org.dsa.iot.dslink.node.value.ValueType
 import org.slf4j.LoggerFactory
-import scala.util.Random
-import java.util.Objects
-import java.util.TimerTask
-import java.util.Timer
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.Duration
-import io.cogswell.dslink.pubsub.util.Scheduler
-
-
 
 object Main extends DSLinkHandler {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -72,20 +64,7 @@ object Main extends DSLinkHandler {
   // Handle initialization of the Responder
   override def onResponderInitialized(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' has been initialized")
-    val VALUE_TYPE = ValueType.NUMBER
-    val CHILD_NAME = "RandomNumbers"
-    val CHILD_TITLE = "Random Numbers"
-    
-    rootNode = link.getNodeManager.getSuperRoot
-      .createChild(CHILD_NAME)
-      .setDisplayName(CHILD_TITLE)
-      .setValueType(VALUE_TYPE)
-      .setValue(new Value(Random.nextDouble()))
-      .build()
-    
-    Scheduler.repeat(Duration(500, TimeUnit.MILLISECONDS)) {
-      rootNode.setValue(new Value(Random.nextDouble()))
-    }
+    val pubsubRoot = PubSubRootNode(link)
   }
   
   // Handle connection of the Responder (happens after initialization)
