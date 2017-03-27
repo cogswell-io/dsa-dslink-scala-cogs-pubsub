@@ -24,6 +24,8 @@ case class PubSubPublisherNode(
   }
   
   private def initUi(): Unit = {
+    logger.info(s"Initializing publisher node for '$channel'")
+    
     val MESSAGE_PARAM = "channel"
     val nodeName = s"publisher:$channel"
     val nodeAlias = s"Publisher [$channel]"
@@ -54,7 +56,10 @@ case class PubSubPublisherNode(
       )) { actionData =>
         val map = actionData.dataMap
         map(MESSAGE_PARAM).value.map(_.getString) match {
-          case None => // TODO: handle missing message
+          case None => {
+            logger.warn("Cannot publish because no message was supplied!")
+            // TODO: handle missing message
+          }
           case Some(message) => connection.publish(channel, message)
         }
       })

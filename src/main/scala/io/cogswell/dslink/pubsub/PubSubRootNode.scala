@@ -25,16 +25,15 @@ case class PubSubRootNode(
     link: DSLink
 )(implicit ec: ExecutionContext) {
   private lazy val manager: NodeManager = link.getNodeManager
-  private lazy val rootNode: Node = manager.getNode("/").getNode
+  private lazy val rootNode: Node = manager.getSuperRoot
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val connections = MutableMap[String, PubSubConnectionNode]()
 
   private def initUi(): Unit = {
     // Random number generator
-    val randNode = link.getNodeManager.getSuperRoot
+    val randNode = rootNode
       .createChild("RandomNumbers")
-      //.setHidden(true)
       .setDisplayName("Random Numbers")
       .setValueType(ValueType.NUMBER)
       .setValue(new Value(Random.nextDouble()))
@@ -99,12 +98,13 @@ case class PubSubRootNode(
   ): Unit = {
     val connection = PubSubConnectionNode(manager, rootNode, name, readKey, writeKey, adminKey, url)
     connections(name) = connection
-    /*
     connection.connect() andThen {
       case Success(_) => logger.info("Connected to the Pub/Sub server.")
       case Failure(error) => logger.error("Error connecting to the Pub/Sub server:", error)
     }
-    */
+    
     // TODO: handle outcome of the connection, indicating failure to the UI
+    // TODO: consider making the addition of the connection contingent upon successful connection,
+    //       unless the child is the correct way to indicate connection failure.
   }
 }

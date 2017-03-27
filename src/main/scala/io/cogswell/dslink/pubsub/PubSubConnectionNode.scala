@@ -20,6 +20,7 @@ import io.cogswell.dslink.pubsub.model.PubSubOptions
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.ActionParam
 import scala.collection.mutable.{Map => MutableMap}
+import scala.util.Failure
 
 case class PubSubConnectionNode(
     manager: NodeManager,
@@ -40,6 +41,8 @@ case class PubSubConnectionNode(
   private val logger = LoggerFactory.getLogger(getClass)
 
   private def initUi(): Unit = {
+    logger.info(s"Initializing connection '$name'")
+    
     val CHANNEL_PARAM = "channel"
     
     // Connection node
@@ -86,14 +89,17 @@ case class PubSubConnectionNode(
       })
       .build()
   }
-
+  
   initUi()
   
   private def addSubscriber(parentNode: Node, channel: String): Unit = {
     logger.info(s"Adding subscriber to channel '$channel'")
     
     connection match {
-      case None => // TODO: handle no connection
+      case None => {
+        logger.warn("No connection found when attempting to subscribe!")
+        // TODO: handle no connection
+      }
       case Some(conn) => {
         val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
         subscribers(channel) = subscriber
@@ -105,7 +111,10 @@ case class PubSubConnectionNode(
     logger.info(s"Adding publisher for channel '$channel'")
     
     connection match {
-      case None => // TODO: handle no connection
+      case None => {
+        logger.warn("No connection found when attempting to setup publisher!")
+        // TODO: handle no connection
+      }
       case Some(conn) => {
         val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
         publishers(channel) = publisher
@@ -114,7 +123,15 @@ case class PubSubConnectionNode(
   }
   
   def connect()(implicit ec: ExecutionContext): Future[PubSubConnection] = {
-    Services.pubSubService.connect(keys, options) map { conn =>
+    // TODO: add close and reconnect handlers to options, and update status based on these
+    
+    Services.pubSubService.connect(keys, options) andThen {
+      case Failure(error) => {
+        logger.error("Error connecting to the pub/sub service:", error)
+        // TODO: handle connection failure: remove node, alert user
+      }
+    } map { conn =>
+      logger.info("Connected to the pub/sub service.")
       connection = Some(conn)
       conn
     }
