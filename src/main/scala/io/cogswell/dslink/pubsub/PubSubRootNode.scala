@@ -20,6 +20,7 @@ import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.Scheduler
 import scala.util.Failure
 import scala.util.Success
+import org.dsa.iot.dslink.node.Writable
 
 case class PubSubRootNode(
     link: DSLink
@@ -30,6 +31,9 @@ case class PubSubRootNode(
   private val logger = LoggerFactory.getLogger(getClass)
   private val connections = MutableMap[String, PubSubConnectionNode]()
 
+  
+  private var numberSink: Option[(Number) => Unit] = None
+  
   private def initNode(): Unit = {
     // Random number generator
     val randNode = rootNode
@@ -42,6 +46,22 @@ case class PubSubRootNode(
     Scheduler.repeat(Duration(500, TimeUnit.MILLISECONDS)) {
       randNode.setValue(new Value(Random.nextDouble()))
     }
+    
+    // Number logger
+    val loggerNode = rootNode
+      .createChild("NumberLogger")
+      .setDisplayName("Number Logger")
+      .setValueType(ValueType.NUMBER)
+      .setWritable(Writable.WRITE)
+      .build()
+      
+    // TODO: the hard part
+    //       - how do we enable an input
+    //       - invoke numberSink when a number is written to our loggerNode
+    
+    numberSink = Some({ number =>
+      logger.info(s"Received number: $number")
+    })
     
     // Connect action
     val NAME_PARAM = "name"
