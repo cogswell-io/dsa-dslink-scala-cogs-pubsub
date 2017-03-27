@@ -30,7 +30,7 @@ case class PubSubRootNode(
   private val logger = LoggerFactory.getLogger(getClass)
   private val connections = MutableMap[String, PubSubConnectionNode]()
 
-  private def initUi(): Unit = {
+  private def initNode(): Unit = {
     // Random number generator
     val randNode = rootNode
       .createChild("RandomNumbers")
@@ -81,13 +81,13 @@ case class PubSubRootNode(
     }
     
     rootNode
-      .createChild("connection")
+      .createChild("connect")
       .setDisplayName("Connect")
       .setAction(connectAction)
       .build()
   }
   
-  initUi()
+  initNode()
   
   private def addConnection(
       name: String,

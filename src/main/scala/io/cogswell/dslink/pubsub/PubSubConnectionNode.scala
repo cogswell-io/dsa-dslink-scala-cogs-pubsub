@@ -40,7 +40,7 @@ case class PubSubConnectionNode(
   
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private def initUi(): Unit = {
+  private def initNode(): Unit = {
     logger.info(s"Initializing connection '$name'")
     
     val CHANNEL_PARAM = "channel"
@@ -90,7 +90,7 @@ case class PubSubConnectionNode(
       .build()
   }
   
-  initUi()
+  initNode()
   
   private def addSubscriber(parentNode: Node, channel: String): Unit = {
     logger.info(s"Adding subscriber to channel '$channel'")

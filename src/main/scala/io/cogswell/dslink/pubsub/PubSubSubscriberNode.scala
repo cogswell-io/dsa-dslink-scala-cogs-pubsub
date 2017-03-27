@@ -25,7 +25,7 @@ case class PubSubSubscriberNode(
   private val logger = LoggerFactory.getLogger(getClass)
   private var messageSource: Option[(PubSubMessage) => Unit] = None
   
-  private def initUi(): Unit = {
+  private def initNode(): Unit = {
     logger.info(s"Initializing subscriber node for '$channel'")
     
     val MESSAGE_PARAM = "channel"
@@ -48,6 +48,7 @@ case class PubSubSubscriberNode(
     val removeNode = subscriberNode.createChild("Remove")
       .setAction(LinkUtils.action(Seq()) { actionData =>
         logger.info(s"Removing subscriber for channel '$channel'")
+        // TODO: unsubscribe from pub/sub service
         parentNode.removeChild(subscriberNode)
       })
       .build()
@@ -58,6 +59,7 @@ case class PubSubSubscriberNode(
           ActionParam(MESSAGE_PARAM, ValueType.STRING)
       )) { actionData =>
         val map = actionData.dataMap
+        
         map(MESSAGE_PARAM).value.map(_.getString) match {
           case None => {
             logger.warn("Cannot publish because no message was supplied!")
@@ -69,7 +71,7 @@ case class PubSubSubscriberNode(
       .build()
   }
   
-  initUi()
+  initNode()
   
   def subscribe()(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
     connection.subscribe(channel, Some({ msg =>

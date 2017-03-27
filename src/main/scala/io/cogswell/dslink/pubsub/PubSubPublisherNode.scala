@@ -23,7 +23,7 @@ case class PubSubPublisherNode(
     connection.publish(channel, message)
   }
   
-  private def initUi(): Unit = {
+  private def initNode(): Unit = {
     logger.info(s"Initializing publisher node for '$channel'")
     
     val MESSAGE_PARAM = "channel"
@@ -66,5 +66,5 @@ case class PubSubPublisherNode(
       .build()
   }
   
-  initUi()
+  initNode()
 }
