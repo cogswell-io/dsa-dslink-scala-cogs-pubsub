@@ -59,7 +59,7 @@ case class PubSubConnectionNode(
       .build()
     
     // Subscribe action node
-    val subscribeNode = connectionNode.createChild("Add Subscribe")
+    val subscribeNode = connectionNode.createChild("Add Subscriber")
       .setAction(LinkUtils.action(Seq(
           ActionParam(CHANNEL_PARAM, ValueType.STRING)
       )) { actionData =>
