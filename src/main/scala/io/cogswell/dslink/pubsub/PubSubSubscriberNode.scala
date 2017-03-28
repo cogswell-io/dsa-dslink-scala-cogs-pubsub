@@ -5,16 +5,16 @@ import scala.concurrent.Future
 
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.node.NodeManager
+import org.dsa.iot.dslink.node.Writable
+import org.dsa.iot.dslink.node.value.Value
+import org.dsa.iot.dslink.node.value.ValueType
+import org.slf4j.LoggerFactory
 
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
-import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
-import org.slf4j.LoggerFactory
-import io.cogswell.dslink.pubsub.util.LinkUtils
-import io.cogswell.dslink.pubsub.util.ActionParam
-import org.dsa.iot.dslink.node.value.ValueType
-import org.dsa.iot.dslink.node.Writable
 import io.cogswell.dslink.pubsub.model.PubSubMessage
-import org.dsa.iot.dslink.node.value.Value
+import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
+import io.cogswell.dslink.pubsub.util.ActionParam
+import io.cogswell.dslink.pubsub.util.LinkUtils
 
 case class PubSubSubscriberNode(
     manager: NodeManager,
@@ -56,7 +56,7 @@ case class PubSubSubscriberNode(
     // Subscriber action node
     val publishNode = subscriberNode.createChild("Publish Message")
       .setAction(LinkUtils.action(Seq(
-          ActionParam(MESSAGE_PARAM, ValueType.STRING)
+          ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
       )) { actionData =>
         val map = actionData.dataMap
         

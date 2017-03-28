@@ -44,6 +44,7 @@ case class PubSubConnectionNode(
     logger.info(s"Initializing connection '$name'")
     
     val CHANNEL_PARAM = "channel"
+    val MESSAGE_PARAM = "message"
     
     // Connection node
     val connectionNode = parentNode.createChild(name).build()
@@ -87,6 +88,25 @@ case class PubSubConnectionNode(
             logger.warn(s"No channel supplied for new publisher.")
             // TODO: handle missing channel
           }
+        }
+      })
+      .build()
+
+    // Publish action
+    val publishNode = connectionNode.createChild("Publish")
+      .setAction(LinkUtils.action(Seq(
+          ActionParam(CHANNEL_PARAM, ValueType.STRING),
+          ActionParam(MESSAGE_PARAM, ValueType.STRING)
+      )) { actionData =>
+        val map = actionData.dataMap
+        val channel = map(CHANNEL_PARAM).value.map(_.getString)
+        val message = map(MESSAGE_PARAM).value.map(_.getString)
+
+        (channel, message) match {
+          case (Some(channel), Some(message)) => {
+            connection.foreach(_.publish(channel, message))
+          }
+          case _ => logger.warn(s"Missing channel and/or message for publish action.")
         }
       })
       .build()

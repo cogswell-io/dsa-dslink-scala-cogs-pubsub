@@ -13,6 +13,7 @@ import org.dsa.iot.dslink.node.Writable
 import io.cogswell.dslink.pubsub.model.PubSubMessage
 import org.dsa.iot.dslink.util.handler.Handler
 import org.dsa.iot.dslink.node.value.ValuePair
+import org.dsa.iot.dslink.node.value.Value
 
 case class PubSubPublisherNode(
     manager: NodeManager,
@@ -60,7 +61,7 @@ case class PubSubPublisherNode(
     // Publisher action node
     val publishNode = publisherNode.createChild("Publish Message")
       .setAction(LinkUtils.action(Seq(
-          ActionParam(MESSAGE_PARAM, ValueType.STRING)
+          ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
       )) { actionData =>
         val map = actionData.dataMap
         map(MESSAGE_PARAM).value.map(_.getString) match {
