@@ -98,14 +98,12 @@ case class PubSubRootNode(
     val URL_PARAM = "url"
     val READ_KEY_PARAM = "read"
     val WRITE_KEY_PARAM = "write"
-    val ADMIN_KEY_PARAM = "admin"
     
     val connectAction = LinkUtils.action(Seq(
         ActionParam(NAME_PARAM, ValueType.STRING),
         ActionParam(URL_PARAM, ValueType.STRING, Some(new Value("wss://api.cogswell.io/pubsub"))),
         ActionParam(READ_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))),
-        ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED"))),
-        ActionParam(ADMIN_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")))
+        ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("UNUSED")))
     )) { actionData =>
       val map = actionData.dataMap
       
@@ -113,7 +111,6 @@ case class PubSubRootNode(
       val url = map(URL_PARAM).value.map(_.getString)
       val readKey = map(READ_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
       val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
-      val adminKey = map(ADMIN_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
       
       // TODO [DGLOG-21]: ensure that the name is not empty, nor a duplicate
       // TODO [DGLOG-21]: ensure that at least one key is supplied
@@ -122,10 +119,9 @@ case class PubSubRootNode(
       logger.info(s"'${URL_PARAM}' : ${url}")
       logger.info(s"'${READ_KEY_PARAM}' : ${readKey}")
       logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
-      logger.info(s"'${ADMIN_KEY_PARAM}' : ${adminKey}")
       logger.info(s"'${NAME_PARAM}' : ${name}")
       
-      addConnection(name, readKey, writeKey, adminKey, url)
+      addConnection(name, readKey, writeKey, url)
       
       logger.info("Connection node should now exist")
     }
@@ -143,10 +139,9 @@ case class PubSubRootNode(
       name: String,
       readKey: Option[String],
       writeKey: Option[String],
-      adminKey: Option[String],
       url: Option[String]
   ): Unit = {
-    val connection = PubSubConnectionNode(manager, rootNode, name, readKey, writeKey, adminKey, url)
+    val connection = PubSubConnectionNode(manager, rootNode, name, readKey, writeKey, url)
     connections(name) = connection
     connection.connect() andThen {
       case Success(_) => logger.info("Connected to the Pub/Sub server.")

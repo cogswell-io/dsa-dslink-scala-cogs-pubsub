@@ -29,14 +29,13 @@ case class PubSubConnectionNode(
     name: String,
     readKey: Option[String] = None,
     writeKey: Option[String] = None,
-    adminKey: Option[String] = None,
     url: Option[String] = None
 )(implicit ec: ExecutionContext) {
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
   private def options: Option[PubSubOptions] = url.map(u => PubSubOptions(url = u))
-  private val keys: Seq[String] = Seq(readKey, writeKey, writeKey).filter(_.isDefined).map(_.get)
+  private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
   private var connection: Option[PubSubConnection] = None
   
   private val logger = LoggerFactory.getLogger(getClass)
