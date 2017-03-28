@@ -12,6 +12,10 @@ import org.dsa.iot.dslink.node.value.ValueType
 import org.dsa.iot.dslink.node.actions.ActionResult
 import org.dsa.iot.dslink.node.Permission
 import org.dsa.iot.dslink.node.actions.Parameter
+import org.dsa.iot.dslink.methods.responses.ListResponse
+import org.dsa.iot.dslink.DSLink
+import org.dsa.iot.dslink.node.Node
+import org.dsa.iot.dslink.methods.requests.ListRequest
 
 /**
  * Class representing a parameter attached to an Action.
@@ -91,5 +95,24 @@ object LinkUtils {
     params.foreach(p => linkAction.addParameter(p.parameter))
     
     linkAction
+  }
+  
+  /**
+   * Listen for updates to the supplied node, and call the supplied
+   * function with the updates.
+   * 
+   * @param link the DSLink
+   * @param node the Node to which we should listen for updates
+   * @param listener the listener to invoke for each update
+   */
+  def listen(link: DSLink, node: Node)(listener: (ListResponse) => Unit): Unit = {
+    val listRequest = new ListRequest(node.getPath)
+    val listHandler = new Handler[ListResponse] {
+      override def handle(response: ListResponse) {
+        listener(response)
+      }
+    }
+
+    link.getRequester.list(listRequest, listHandler)
   }
 }

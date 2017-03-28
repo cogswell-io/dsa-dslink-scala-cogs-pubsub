@@ -15,7 +15,7 @@ object Main extends DSLinkHandler {
   private var rootNode: Node = _
 
   override val isResponder = true
-  override val isRequester = false
+  override val isRequester = true
 
 // General handlers
   
