@@ -35,12 +35,16 @@ case class PubSubConnectionNode(
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
+  private def setStatus(status: Stsring): Unit = {
+    statusNode.foreach(_.setValue(new Value(status)))
+  }
+  
   private def closeHandler: (Option[Throwable]) => Unit = { cause =>
-    statusNode.foreach(_.setValue(new Value("Disconnected")))
+    setStatus("Disconnected")
   }
 
   private def reconnectHandler: () => Unit = { () =>
-    statusNode.foreach(_.setValue(new Value("Connected")))
+    setStatus("Connected")
     validateSubscriptions()
   }
   
@@ -188,6 +192,8 @@ case class PubSubConnectionNode(
       }
     } map { conn =>
       logger.info("Connected to the pub/sub service.")
+      
+      setStatus("Connected")
       connection = Some(conn)
       conn
     }
