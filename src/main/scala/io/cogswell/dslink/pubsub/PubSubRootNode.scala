@@ -104,8 +104,8 @@ case class PubSubRootNode(
       val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
       val adminKey = map(ADMIN_KEY_PARAM).value.map(_.getString).filter(_ != "UNUSED")
       
-      // TODO: ensure that the name is not empty, nor a duplicate
-      // TODO: ensure that at least one key is supplied
+      // TODO [DGLOG-21]: ensure that the name is not empty, nor a duplicate
+      // TODO [DGLOG-21]: ensure that at least one key is supplied
       
       logger.info(s"Clicked Invoke to Create a Connection")
       logger.info(s"'${URL_PARAM}' : ${url}")
@@ -142,8 +142,8 @@ case class PubSubRootNode(
       case Failure(error) => logger.error("Error connecting to the Pub/Sub server:", error)
     }
     
-    // TODO: handle outcome of the connection, indicating failure to the UI
-    // TODO: consider making the addition of the connection contingent upon successful connection,
+    // TODO [DGLOG-22]: handle outcome of the connection, indicating failure to the UI
+    // TODO [DGLOG-22]: consider making the addition of the connection contingent upon successful connection,
     //       unless the child is the correct way to indicate connection failure.
   }
 }
