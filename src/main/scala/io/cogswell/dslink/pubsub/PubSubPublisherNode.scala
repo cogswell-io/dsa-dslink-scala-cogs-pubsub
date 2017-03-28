@@ -11,6 +11,8 @@ import scala.concurrent.ExecutionContext
 import org.slf4j.LoggerFactory
 import org.dsa.iot.dslink.node.Writable
 import io.cogswell.dslink.pubsub.model.PubSubMessage
+import org.dsa.iot.dslink.util.handler.Handler
+import org.dsa.iot.dslink.node.value.ValuePair
 
 case class PubSubPublisherNode(
     manager: NodeManager,
@@ -37,9 +39,15 @@ case class PubSubPublisherNode(
       .setWritable(Writable.WRITE)
       .setValueType(ValueType.STRING)
       .build()
-      
-      // TODO: listen for changes to the node's value, and publish when it changes
-      //publishNode.setValue(value, externalSource)
+    
+    // Handle updates to the 
+    publisherNode.getListener.setValueHandler(new Handler[ValuePair]{
+      override def handle(pair: ValuePair): Unit = {
+        Option(pair.getCurrent).map(_.getString) match {
+          case Some(msg) => connection.publish(channel, msg)
+        }
+      }
+    })
     
     // Disconnect action node
     val removeNode = publisherNode.createChild("Remove Publisher")

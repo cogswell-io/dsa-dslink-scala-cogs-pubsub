@@ -21,6 +21,8 @@ import io.cogswell.dslink.pubsub.util.Scheduler
 import scala.util.Failure
 import scala.util.Success
 import org.dsa.iot.dslink.node.Writable
+import org.dsa.iot.dslink.node.value.ValuePair
+import org.dsa.iot.dslink.util.handler.Handler
 
 case class PubSubRootNode(
     link: DSLink
@@ -56,6 +58,15 @@ case class PubSubRootNode(
       .setValueType(ValueType.NUMBER)
       .setWritable(Writable.WRITE)
       .build()
+
+    // Handle updates to the 
+    loggerNode.getListener.setValueHandler(new Handler[ValuePair]{
+      override def handle(pair: ValuePair): Unit = {
+        Option(pair.getCurrent).map(_.getNumber) match {
+          case Some(number) => numberSink.foreach(_(number))
+        }
+      }
+    })
       
     logger.info(s"link = $link")
     logger.info(s"loggerNode = $loggerNode")
