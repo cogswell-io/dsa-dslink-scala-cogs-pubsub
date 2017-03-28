@@ -59,14 +59,8 @@ case class PubSubSubscriberNode(
           ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
       )) { actionData =>
         val map = actionData.dataMap
-        
-        map(MESSAGE_PARAM).value.map(_.getString) match {
-          case None => {
-            logger.warn("Cannot publish because no message was supplied!")
-            // TODO [DGLOG-25]: handle missing message
-          }
-          case Some(message) => connection.publish(channel, message)
-        }
+        val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
+        connection.publish(channel, message)
       })
       .build()
   }

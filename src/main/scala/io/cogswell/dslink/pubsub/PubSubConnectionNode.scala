@@ -22,6 +22,7 @@ import io.cogswell.dslink.pubsub.util.ActionParam
 import scala.collection.mutable.{Map => MutableMap}
 import scala.util.Failure
 import scala.util.Success
+import org.dsa.iot.dslink.node.value.Value
 
 case class PubSubConnectionNode(
     manager: NodeManager,
@@ -96,16 +97,13 @@ case class PubSubConnectionNode(
     val publishNode = connectionNode.createChild("Publish")
       .setAction(LinkUtils.action(Seq(
           ActionParam(CHANNEL_PARAM, ValueType.STRING),
-          ActionParam(MESSAGE_PARAM, ValueType.STRING)
+          ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
       )) { actionData =>
         val map = actionData.dataMap
-        val channel = map(CHANNEL_PARAM).value.map(_.getString)
-        val message = map(MESSAGE_PARAM).value.map(_.getString)
+        val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
 
-        (channel, message) match {
-          case (Some(channel), Some(message)) => {
-            connection.foreach(_.publish(channel, message))
-          }
+        map(CHANNEL_PARAM).value.map(_.getString) match {
+          case Some(channel) => connection.foreach(_.publish(channel, message))
           case _ => logger.warn(s"Missing channel and/or message for publish action.")
         }
       })
