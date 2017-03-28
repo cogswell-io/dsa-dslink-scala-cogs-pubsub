@@ -68,7 +68,7 @@ case class PubSubConnectionNode(
           case Some(channel) => addSubscriber(connectionNode, channel)
           case None => {
             logger.warn(s"No channel supplied for new subscriber.")
-            // TODO: handle missing channel
+            // TODO [DGLOG-24]: handle missing channel
           }
         }
       })
@@ -85,7 +85,7 @@ case class PubSubConnectionNode(
           case Some(channel) => addPublisher(connectionNode, channel)
           case None => {
             logger.warn(s"No channel supplied for new publisher.")
-            // TODO: handle missing channel
+            // TODO [DGLOG-24]: handle missing channel
           }
         }
       })
@@ -100,7 +100,7 @@ case class PubSubConnectionNode(
     connection match {
       case None => {
         logger.warn("No connection found when attempting to subscribe!")
-        // TODO: handle no connection
+        // TODO [DGLOG-24]: handle no connection
       }
       case Some(conn) => {
         val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
@@ -120,7 +120,7 @@ case class PubSubConnectionNode(
     connection match {
       case None => {
         logger.warn("No connection found when attempting to setup publisher!")
-        // TODO: handle no connection
+        // TODO [DGLOG-24]: handle no connection
       }
       case Some(conn) => {
         val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
@@ -135,7 +135,7 @@ case class PubSubConnectionNode(
     Services.pubSubService.connect(keys, options) andThen {
       case Failure(error) => {
         logger.error("Error connecting to the pub/sub service:", error)
-        // TODO: handle connection failure: remove node, alert user
+        // TODO [DGLOG-22]: handle connection failure: remove node, alert user
       }
     } map { conn =>
       logger.info("Connected to the pub/sub service.")
