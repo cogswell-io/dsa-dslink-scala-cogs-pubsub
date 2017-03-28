@@ -63,7 +63,7 @@ case class PubSubSubscriberNode(
         map(MESSAGE_PARAM).value.map(_.getString) match {
           case None => {
             logger.warn("Cannot publish because no message was supplied!")
-            // TODO: handle missing message
+            // TODO [DGLOG-25]: handle missing message
           }
           case Some(message) => connection.publish(channel, message)
         }
