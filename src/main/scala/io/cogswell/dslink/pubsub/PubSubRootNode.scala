@@ -1,6 +1,7 @@
 package io.cogswell.dslink.pubsub
 
 import java.util.concurrent.TimeUnit
+import javax.sound.midi.InvalidMidiDataException
 
 import scala.collection.mutable.{Map => MutableMap}
 import scala.collection.mutable.MutableList
@@ -111,6 +112,18 @@ case class PubSubRootNode(
       val url = map(URL_PARAM).value.map(_.getString).filter(!_.isEmpty)
       val readKey = map(READ_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
       val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
+      
+      if(connections.keys.toSeq.contains(name)){
+        throw new IllegalArgumentException(s"Name $name already in use.")
+      }
+      
+      if(url.isEmpty){
+        throw new IllegalArgumentException("Url must be provided.")
+      }
+      
+      if(readKey.isEmpty && writeKey.isEmpty){
+        throw new IllegalArgumentException("At least one key must be provided.");
+      }
       
       // TODO [DGLOG-21]: ensure that the url is not None
       // TODO [DGLOG-21]: ensure that the name is not None
