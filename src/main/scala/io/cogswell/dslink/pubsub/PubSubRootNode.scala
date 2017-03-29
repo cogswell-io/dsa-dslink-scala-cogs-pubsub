@@ -72,24 +72,6 @@ case class PubSubRootNode(
     logger.info(s"link = $link")
     logger.info(s"loggerNode = $loggerNode")
 
-    // XXX: WARNING
-    //      We cannot actually access the requestor unless it has been initialized.
-    //      There is a pretty strict separation between the responder and the
-    //      requester which breaks with the model we have been using. We may need to
-    //      rework our entire structure in order to permit forwarding of events
-    //      into pub/sub channels!
-    /*
-    LinkUtils.listen(link, loggerNode) { r =>
-      numberSink.foreach(_(r.getNode.getValue.getNumber))
-    }
-    */
-    
-    // TODO: [DGLOG-18] the hard part
-    //       - how do we enable an input
-    
-    // TODO: [DGLOG-5] the easier part
-    //       - invoke numberSink when a number is written to our loggerNode
-    
     numberSink = Some({ number =>
       logger.info(s"Received number: $number")
     })
