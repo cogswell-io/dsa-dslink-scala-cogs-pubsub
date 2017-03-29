@@ -55,4 +55,8 @@ case class CogsPubSubConnection(
   )(implicit ec: ExecutionContext): Future[UUID] = {
     Futures.convert(pubSubHandle.publishWithAck(channel, message))
   }
+  
+  override def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]] = {
+    Futures.convert(pubSubHandle.listSubscriptions).map(_.toSeq)
+  }
 }

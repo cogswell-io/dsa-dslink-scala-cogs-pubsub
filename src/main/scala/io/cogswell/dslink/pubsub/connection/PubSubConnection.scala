@@ -47,4 +47,12 @@ trait PubSubConnection {
   def publish(
       channel: String, message: String
   )(implicit ec: ExecutionContext): Future[UUID]
+  
+  /**
+   * List the subscriptions associated with this connections sessions.
+   * 
+   * @return a Future which, if successful, will contain a sequence containing
+   * the channels to which the connection's session is subscribed
+   */
+  def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]]
 }

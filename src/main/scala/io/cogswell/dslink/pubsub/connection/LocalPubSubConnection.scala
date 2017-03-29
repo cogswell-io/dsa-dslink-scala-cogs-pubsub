@@ -53,4 +53,8 @@ case class LocalPubSubConnection(
 
     Future.successful(messageRecord.id)
   }
+
+  override def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]] = {
+    Future.successful(subscribers.keySet.toSeq)
+  }
 }

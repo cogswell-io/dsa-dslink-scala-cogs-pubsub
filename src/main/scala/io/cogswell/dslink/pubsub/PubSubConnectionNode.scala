@@ -35,6 +35,12 @@ case class PubSubConnectionNode(
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
+  private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
+  private var connection: Option[PubSubConnection] = None
+  
+  private val logger = LoggerFactory.getLogger(getClass)
+  private var statusNode: Option[Node] = None
+
   private def setStatus(status: String): Unit = {
     statusNode.foreach(_.setValue(new Value(status)))
   }
@@ -48,8 +54,44 @@ case class PubSubConnectionNode(
     validateSubscriptions()
   }
   
+  /**
+   * Confirm that the subscriptions in the pub/sub service match those
+   * which we have stored in this connection. If there are subscriptions 
+   * missing, re-subscribe to those channels. If there are extraneous
+   * subscriptions, un-subscribe from those channels.
+   */
   private def validateSubscriptions(): Unit = {
-    // TODO: [DGLOG_32] ensure subscriptions are correct
+    connection.foreach { conn =>
+      conn.subscriptions() map { _.toSet } map { subs =>
+        // Combine all channels both the pub/sub service and locally
+        val channels = subs ++ subscribers.keys
+        
+        channels.map { channel =>
+          // Identify to which a channel belongs (service, local, or both)
+          (channel, subscribers.contains(channel), subs.contains(channel))
+        } foreach {
+          case (channel, true, false) => {
+            // If a channel is local only, re-subscribe to it. 
+            subscribers.get(channel).foreach { node =>
+              node.subscribe() andThen {
+                case Success(_) => logger.info(s"Re-subscribed to channel ${channel}")
+                case Failure(error) => logger.error(s"Error re-subscribing to channel ${channel}:", error)
+              }
+            }
+          }
+          case (channel, false, true) => {
+            // If a channel is on the service only, un-subscribe from it.
+            connection.foreach { conn =>
+              conn.unsubscribe(channel) andThen {
+                case Success(_) => logger.info(s"Successfully un-subsbscribed from channel ${channel}")
+                case Failure(error) => logger.error(s"Error un-subsbscribed from channel ${channel}:", error)
+              }
+            }
+          }
+          case _ => // Already in sync; no update needed.
+        }
+      }
+    }
   }
   
   private def options: PubSubOptions = {
@@ -62,12 +104,6 @@ case class PubSubConnectionNode(
     
     opts
   }
-
-  private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
-  private var connection: Option[PubSubConnection] = None
-  
-  private val logger = LoggerFactory.getLogger(getClass)
-  private var statusNode: Option[Node] = None
 
   private def initNode(): Unit = {
     logger.info(s"Initializing connection '$name'")
