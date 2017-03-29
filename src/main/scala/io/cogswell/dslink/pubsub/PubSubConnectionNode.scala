@@ -35,11 +35,39 @@ case class PubSubConnectionNode(
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
-  private def options: Option[PubSubOptions] = url.map(u => PubSubOptions(url = u))
+  private def setStatus(status: String): Unit = {
+    statusNode.foreach(_.setValue(new Value(status)))
+  }
+  
+  private def closeHandler: (Option[Throwable]) => Unit = { cause =>
+    setStatus("Disconnected")
+  }
+
+  private def reconnectHandler: () => Unit = { () =>
+    setStatus("Connected")
+    validateSubscriptions()
+  }
+  
+  private def validateSubscriptions(): Unit = {
+    // TODO: [DGLOG_32] ensure subscriptions are correct
+  }
+  
+  private def options: PubSubOptions = {
+    val opts = PubSubOptions(
+      closeListener = Some(closeHandler),
+      reconnectListener = Some(reconnectHandler)
+    )
+    
+    url.foreach(opts.withUrl(_))
+    
+    opts
+  }
+
   private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
   private var connection: Option[PubSubConnection] = None
   
   private val logger = LoggerFactory.getLogger(getClass)
+  private var statusNode: Option[Node] = None
 
   private def initNode(): Unit = {
     logger.info(s"Initializing connection '$name'")
@@ -49,6 +77,13 @@ case class PubSubConnectionNode(
     
     // Connection node
     val connectionNode = parentNode.createChild(name).build()
+    
+    // Status indicator node
+    val statusNode = Some(connectionNode.createChild("Status")
+        .setValueType(ValueType.STRING)
+        .setValue(new Value("Unknown"))
+        .build()
+    )
     
     // Disconnect action node
     val disconnectNode = connectionNode.createChild("Disconnect")
@@ -92,7 +127,7 @@ case class PubSubConnectionNode(
         }
       })
       .build()
-
+    
     // Publish action
     val publishNode = connectionNode.createChild("Publish")
       .setAction(LinkUtils.action(Seq(
@@ -150,13 +185,15 @@ case class PubSubConnectionNode(
   def connect()(implicit ec: ExecutionContext): Future[PubSubConnection] = {
     // TODO: add close and reconnect handlers to options, and update status based on these
     
-    Services.pubSubService.connect(keys, options) andThen {
+    Services.pubSubService.connect(keys, Some(options)) andThen {
       case Failure(error) => {
         logger.error("Error connecting to the pub/sub service:", error)
         // TODO [DGLOG-22]: handle connection failure: remove node, alert user
       }
     } map { conn =>
       logger.info("Connected to the pub/sub service.")
+      
+      setStatus("Connected")
       connection = Some(conn)
       conn
     }
