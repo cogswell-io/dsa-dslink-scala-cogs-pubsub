@@ -54,5 +54,5 @@ trait PubSubConnection {
    * @return a Future which, if successful, will contain a sequence containing
    * the channels to which the connection's session is subscribed
    */
-  def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]]
+  def subscriptions()(implicit ec: ExecutionContext): Future[Set[String]]
 }

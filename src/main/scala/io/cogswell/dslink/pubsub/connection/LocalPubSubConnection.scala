@@ -2,9 +2,10 @@ package io.cogswell.dslink.pubsub.connection
 
 import java.util.UUID
 
+import scala.collection.JavaConversions._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.MultiMap
-import scala.collection.mutable.Set
+import scala.collection.mutable.{ Set => MutableSet }
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -20,7 +21,7 @@ case class LocalPubSubConnection(
     options: Option[PubSubOptions]
 ) extends PubSubConnection {
   type MessageListener = (PubSubMessage) => Unit
-  private val subscribers = new HashMap[String, Set[MessageListener]] with MultiMap[String, MessageListener]
+  private val subscribers = new HashMap[String, MutableSet[MessageListener]] with MultiMap[String, MessageListener]
 
   override def disconnect()(implicit ec: ExecutionContext): Future[Unit] = {
     subscribers.clear()
@@ -54,7 +55,7 @@ case class LocalPubSubConnection(
     Future.successful(messageRecord.id)
   }
 
-  override def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]] = {
-    Future.successful(subscribers.keySet.toSeq)
+  override def subscriptions()(implicit ec: ExecutionContext): Future[Set[String]] = {
+    Future.successful(Set(subscribers.keySet.toSeq: _*))
   }
 }

@@ -2,6 +2,7 @@ package io.cogswell.dslink.pubsub.connection
 
 import java.util.UUID
 
+import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -56,7 +57,7 @@ case class CogsPubSubConnection(
     Futures.convert(pubSubHandle.publishWithAck(channel, message))
   }
   
-  override def subscriptions()(implicit ec: ExecutionContext): Future[Seq[String]] = {
-    Futures.convert(pubSubHandle.listSubscriptions).map(_.toSeq)
+  override def subscriptions()(implicit ec: ExecutionContext): Future[Set[String]] = {
+    Futures.convert(pubSubHandle.listSubscriptions).map(_.toList.toSet)
   }
 }
