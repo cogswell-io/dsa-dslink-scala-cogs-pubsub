@@ -35,7 +35,7 @@ case class PubSubConnectionNode(
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
-  private def setStatus(status: Stsring): Unit = {
+  private def setStatus(status: String): Unit = {
     statusNode.foreach(_.setValue(new Value(status)))
   }
   
