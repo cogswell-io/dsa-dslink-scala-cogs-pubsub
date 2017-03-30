@@ -21,12 +21,11 @@ import org.dsa.iot.dslink.node.value.ValueType
 import org.dsa.iot.dslink.util.handler.Handler
 import org.slf4j.LoggerFactory
 
-import com.google.common.base.Throwables
-
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
 import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.Scheduler
+import io.cogswell.dslink.pubsub.util.StringyException
 
 case class PubSubRootNode(
     link: DSLink
@@ -116,12 +115,7 @@ case class PubSubRootNode(
       logger.info(s"'${READ_KEY_PARAM}' : ${readKey}")
       logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
       logger.info(s"'${NAME_PARAM}' : ${name}")
-      
-      class StringyException(cause: Throwable = null) extends Exception(cause) {
-        override def getMessage(): String = {
-          Throwables.getStackTraceAsString(cause)
-        }
-      }
+   
       
       Await.result(
         addConnection(name, readKey, writeKey, url) transform({v => v}, {e => new StringyException(e)}),
