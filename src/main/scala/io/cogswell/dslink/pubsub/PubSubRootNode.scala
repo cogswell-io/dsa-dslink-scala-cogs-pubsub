@@ -1,29 +1,32 @@
 package io.cogswell.dslink.pubsub
 
 import java.util.concurrent.TimeUnit
-import javax.sound.midi.InvalidMidiDataException
 
-import scala.collection.mutable.{Map => MutableMap}
-import scala.collection.mutable.MutableList
+import scala.collection.mutable.{ Map => MutableMap }
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.util.Failure
 import scala.util.Random
+import scala.util.Success
 
 import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.node.NodeManager
+import org.dsa.iot.dslink.node.Writable
 import org.dsa.iot.dslink.node.value.Value
+import org.dsa.iot.dslink.node.value.ValuePair
 import org.dsa.iot.dslink.node.value.ValueType
+import org.dsa.iot.dslink.util.handler.Handler
 import org.slf4j.LoggerFactory
 
+import com.google.common.base.Throwables
+
+import io.cogswell.dslink.pubsub.connection.PubSubConnection
 import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.Scheduler
-import scala.util.Failure
-import scala.util.Success
-import org.dsa.iot.dslink.node.Writable
-import org.dsa.iot.dslink.node.value.ValuePair
-import org.dsa.iot.dslink.util.handler.Handler
 
 case class PubSubRootNode(
     link: DSLink
@@ -35,6 +38,7 @@ case class PubSubRootNode(
   private val connections = MutableMap[String, PubSubConnectionNode]()
   
   private var numberSink: Option[(Number) => Unit] = None
+  private var connectNode: Node = _
   
   private def initNode(): Unit = {
     // Random number generator
@@ -107,22 +111,27 @@ case class PubSubRootNode(
         throw new IllegalArgumentException("At least one key must be provided.");
       }
       
-      // TODO [DGLOG-21]: ensure that the url is not None
-      // TODO [DGLOG-21]: ensure that the name is not None
-      // TODO [DGLOG-21]: ensure that at least one key is supplied
-      
       logger.info(s"Clicked Invoke to Create a Connection")
       logger.info(s"'${URL_PARAM}' : ${url}")
       logger.info(s"'${READ_KEY_PARAM}' : ${readKey}")
       logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
       logger.info(s"'${NAME_PARAM}' : ${name}")
       
-      addConnection(name, readKey, writeKey, url)
+      class StringyException(cause: Throwable = null) extends Exception(cause) {
+        override def getMessage(): String = {
+          Throwables.getStackTraceAsString(cause)
+        }
+      }
+      
+      Await.result(
+        addConnection(name, readKey, writeKey, url) transform({v => v}, {e => new StringyException(e)}),
+        Duration(30, TimeUnit.SECONDS)
+      )
       
       logger.info("Connection node should now exist")
     }
     
-    rootNode
+    connectNode = rootNode
       .createChild("connect")
       .setDisplayName("Connect")
       .setAction(connectAction)
@@ -131,21 +140,25 @@ case class PubSubRootNode(
   
   initNode()
   
+  def destroy(): Unit = {
+    connections.foreach(_._2.destroy())
+    rootNode.removeChild(connectNode)
+  }
+  
   private def addConnection(
       name: String,
       readKey: Option[String],
       writeKey: Option[String],
       url: Option[String]
-  ): Unit = {
+  ): Future[PubSubConnection] = {
     val connection = PubSubConnectionNode(manager, rootNode, name, readKey, writeKey, url)
     connections(name) = connection
     connection.connect() andThen {
       case Success(_) => logger.info("Connected to the Pub/Sub server.")
-      case Failure(error) => logger.error("Error connecting to the Pub/Sub server:", error)
+      case Failure(error) => {
+        logger.error("Error connecting to the Pub/Sub service:", error)
+        connection.destroy()
+      }
     }
-    
-    // TODO [DGLOG-22]: handle outcome of the connection, indicating failure to the UI
-    // TODO [DGLOG-22]: consider making the addition of the connection contingent upon successful connection,
-    //       unless the child is the correct way to indicate connection failure.
   }
 }

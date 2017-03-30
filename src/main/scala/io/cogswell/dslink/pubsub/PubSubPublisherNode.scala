@@ -14,6 +14,8 @@ import io.cogswell.dslink.pubsub.model.PubSubMessage
 import org.dsa.iot.dslink.util.handler.Handler
 import org.dsa.iot.dslink.node.value.ValuePair
 import org.dsa.iot.dslink.node.value.Value
+import scala.util.Failure
+import scala.util.Success
 
 case class PubSubPublisherNode(
     manager: NodeManager,
@@ -25,6 +27,8 @@ case class PubSubPublisherNode(
   private val messageSink: (String) => Unit = { message =>
     connection.publish(channel, message)
   }
+
+  private var publisherNode: Node = _
   
   private def initNode(): Unit = {
     logger.info(s"Initializing publisher node for '$channel'")
@@ -34,7 +38,7 @@ case class PubSubPublisherNode(
     val nodeAlias = s"Publisher [$channel]"
     
     // Connection node
-    val publisherNode = parentNode
+    publisherNode = parentNode
       .createChild(nodeName)
       .setDisplayName(nodeAlias)
       .setWritable(Writable.WRITE)
@@ -65,10 +69,21 @@ case class PubSubPublisherNode(
       )) { actionData =>
         val map = actionData.dataMap
         val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
-        connection.publish(channel, message)
+        
+        connection.publish(channel, message) andThen {
+          case Failure(error) => logger.error(s"Error publishing to channel '$channel'", error)
+          case Success(messageId) => {
+            logger.debug(s"Successfully published message '$messageId' to channel '$channel'")
+          }
+        }
       })
       .build()
   }
   
   initNode()
+
+  def destroy(): Unit = {
+    parentNode.removeChild(publisherNode)
+    connection.unsubscribe(channel)
+  }
 }

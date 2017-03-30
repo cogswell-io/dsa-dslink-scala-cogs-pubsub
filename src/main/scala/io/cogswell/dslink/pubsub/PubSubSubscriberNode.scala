@@ -24,6 +24,7 @@ case class PubSubSubscriberNode(
 )(implicit ec: ExecutionContext) {
   private val logger = LoggerFactory.getLogger(getClass)
   private var messageSource: Option[(PubSubMessage) => Unit] = None
+  private var subscriberNode: Node = _
   
   private def initNode(): Unit = {
     logger.info(s"Initializing subscriber node for '$channel'")
@@ -33,7 +34,7 @@ case class PubSubSubscriberNode(
     val nodeAlias = s"Subscriber [$channel]"
     
     // Connection node
-    val subscriberNode = parentNode
+    subscriberNode = parentNode
       .createChild(nodeName)
       .setDisplayName(nodeAlias)
       .setWritable(Writable.NEVER)
@@ -67,6 +68,11 @@ case class PubSubSubscriberNode(
   
   initNode()
   
+  def destroy(): Unit = {
+    parentNode.removeChild(subscriberNode)
+    connection.unsubscribe(channel)
+  }
+
   def subscribe()(implicit ec: ExecutionContext): Future[PubSubSubscriber] = {
     connection.subscribe(channel, Some({ msg =>
       messageSource.foreach(_(msg))

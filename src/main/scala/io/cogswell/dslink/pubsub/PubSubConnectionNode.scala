@@ -23,6 +23,11 @@ import scala.collection.mutable.{Map => MutableMap}
 import scala.util.Failure
 import scala.util.Success
 import org.dsa.iot.dslink.node.value.Value
+import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import java.util.concurrent.TimeUnit
+
 
 case class PubSubConnectionNode(
     manager: NodeManager,
@@ -37,11 +42,13 @@ case class PubSubConnectionNode(
   
   private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
   private var connection: Option[PubSubConnection] = None
+  private var connectionNode: Node = _
   
   private val logger = LoggerFactory.getLogger(getClass)
   private var statusNode: Option[Node] = None
 
   private def setStatus(status: String): Unit = {
+    logger.info(s"Setting status to '$status' for connection '$name'")
     statusNode.foreach(_.setValue(new Value(status)))
   }
   
@@ -112,13 +119,14 @@ case class PubSubConnectionNode(
     val MESSAGE_PARAM = "message"
     
     // Connection node
-    val connectionNode = parentNode.createChild(name).build()
+    connectionNode = parentNode.createChild(name).build()
     
     // Status indicator node
-    val statusNode = Some(connectionNode.createChild("Status")
-        .setValueType(ValueType.STRING)
-        .setValue(new Value("Unknown"))
-        .build()
+    statusNode = Some(
+      connectionNode.createChild("Status")
+      .setValueType(ValueType.STRING)
+      .setValue(new Value("Unknown"))
+      .build()
     )
     
     // Disconnect action node
@@ -138,10 +146,13 @@ case class PubSubConnectionNode(
         val map = actionData.dataMap
         
         map(CHANNEL_PARAM).value.map(_.getString) match {
-          case Some(channel) => addSubscriber(connectionNode, channel)
+          case Some(channel) => {
+            Await.result(addSubscriber(connectionNode, channel), Duration(30, TimeUnit.SECONDS))
+          }
           case None => {
-            logger.warn(s"No channel supplied for new subscriber.")
-            // TODO [DGLOG-24]: handle missing channel
+            val message = "No channel supplied for new subscriber."
+            logger.warn(message)
+            throw new IllegalArgumentException(message)
           }
         }
       })
@@ -157,8 +168,9 @@ case class PubSubConnectionNode(
         map(CHANNEL_PARAM).value.map(_.getString) match {
           case Some(channel) => addPublisher(connectionNode, channel)
           case None => {
-            logger.warn(s"No channel supplied for new publisher.")
-            // TODO [DGLOG-24]: handle missing channel
+            val message = "No channel supplied for new publisher."
+            logger.warn(message)
+            throw new IllegalArgumentException(message)
           }
         }
       })
@@ -175,7 +187,11 @@ case class PubSubConnectionNode(
 
         map(CHANNEL_PARAM).value.map(_.getString) match {
           case Some(channel) => connection.foreach(_.publish(channel, message))
-          case _ => logger.warn(s"Missing channel and/or message for publish action.")
+          case _ => {
+            val message = "Missing channel and/or message for publish action."
+            logger.warn(message)
+            throw new IllegalArgumentException(message)
+          }
         }
       })
       .build()
@@ -183,22 +199,28 @@ case class PubSubConnectionNode(
   
   initNode()
   
-  private def addSubscriber(parentNode: Node, channel: String): Unit = {
+  private def addSubscriber(parentNode: Node, channel: String): Future[Unit] = {
     logger.info(s"Adding subscriber to channel '$channel'")
     
     connection match {
       case None => {
         logger.warn("No connection found when attempting to subscribe!")
         // TODO [DGLOG-24]: handle no connection
+        Future.successful(Unit)
       }
       case Some(conn) => {
         val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
-        subscribers(channel) = subscriber
         
         subscriber.subscribe() andThen {
-          case Success(_) => logger.info(s"[$name] Succesfully subscribed to channel '$channel'")
-          case Failure(error) => logger.error(s"[$name] Error subscribing to channel '$channel':", error)
-        }
+          case Success(_) => {
+            logger.info(s"[$name] Succesfully subscribed to channel '$channel'")
+            subscribers.put(channel, subscriber)
+          }
+          case Failure(error) => {
+            logger.error(s"[$name] Error subscribing to channel '$channel':", error)
+            subscriber.destroy()
+          }
+        } map { _ => Unit }
       }
     }
   }
@@ -213,20 +235,21 @@ case class PubSubConnectionNode(
       }
       case Some(conn) => {
         val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
-        publishers(channel) = publisher
+        publishers.put(channel, publisher)
       }
     }
   }
   
+  def destroy(): Unit = {
+    subscribers.foreach(_._2.destroy())
+    publishers.foreach(_._2.destroy())
+
+    connection.foreach(_.disconnect())
+    parentNode.removeChild(connectionNode)
+  }
+  
   def connect()(implicit ec: ExecutionContext): Future[PubSubConnection] = {
-    // TODO: add close and reconnect handlers to options, and update status based on these
-    
-    Services.pubSubService.connect(keys, Some(options)) andThen {
-      case Failure(error) => {
-        logger.error("Error connecting to the pub/sub service:", error)
-        // TODO [DGLOG-22]: handle connection failure: remove node, alert user
-      }
-    } map { conn =>
+    Services.pubSubService.connect(keys, Some(options)) map { conn =>
       logger.info("Connected to the pub/sub service.")
       
       setStatus("Connected")
