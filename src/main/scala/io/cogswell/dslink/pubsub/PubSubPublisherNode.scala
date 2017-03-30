@@ -70,12 +70,7 @@ case class PubSubPublisherNode(
         val map = actionData.dataMap
         val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
         
-        connection.publish(channel, message) andThen {
-          case Failure(error) => logger.error(s"Error publishing to channel '$channel'", error)
-          case Success(messageId) => {
-            logger.debug(s"Successfully published message '$messageId' to channel '$channel'")
-          }
-        }
+        connection.publish(channel, message)
       })
       .build()
   }

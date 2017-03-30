@@ -17,10 +17,15 @@ import com.gambit.sdk.pubsub.PubSubMessageRecord
 import org.joda.time.DateTime
 import java.time.ZoneId
 import io.cogswell.dslink.pubsub.util.TimeUtils
+import org.slf4j.LoggerFactory
+import scala.util.Failure
+import scala.util.Success
 
 case class CogsPubSubConnection(
     pubSubHandle: PubSubHandle
 ) extends PubSubConnection {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   override def disconnect()(implicit ec: ExecutionContext): Future[Unit] = {
     Futures.convert(pubSubHandle.close()).map(_ => Unit)
   }
@@ -43,7 +48,7 @@ case class CogsPubSubConnection(
       CogsPubSubSubscriber(this, channel)
     }
   }
-
+  
   override def unsubscribe(
       channel: String
   )(implicit ec: ExecutionContext): Future[Unit] = {
@@ -54,7 +59,12 @@ case class CogsPubSubConnection(
       channel: String,
       message: String
   )(implicit ec: ExecutionContext): Future[UUID] = {
-    Futures.convert(pubSubHandle.publishWithAck(channel, message))
+    Futures.convert(pubSubHandle.publishWithAck(channel, message)) andThen {
+      case Failure(error) => logger.error(s"Failed to publish to channel '$channel'", error)
+      case Success(messageId) => {
+        logger.debug(s"Successfully published message '$messageId' to channel '$channel'")
+      }
+    }
   }
   
   override def subscriptions()(implicit ec: ExecutionContext): Future[Set[String]] = {
