@@ -24,27 +24,8 @@ case class PubSubOptions(
     reconnectListener: Option[() => Unit] = None,
     errorResponseListener: Option[(PubSubErrorResponse) => Unit] = None,
     rawRecordListener: Option[(String) => Unit] = None,
-    url: String = "wss://api.cogswell.io/pubsub"
+    url: Option[String] = None
 ) {
-  /**
-   * Supplies a copy the same options with a different URL.
-   * 
-   * @param altUrl the alternate URL
-   * 
-   * @return the new options containing the alternate URL
-   */
-  def withUrl(altUrl: String): PubSubOptions = {
-    PubSubOptions(
-      messageListener,
-      errorListener,
-      closeListener,
-      reconnectListener,
-      errorResponseListener,
-      rawRecordListener,
-      altUrl
-    )
-  }
-
   def messageHandler: Option[PubSubMessageHandler] = messageListener.map(CogsUtils.messageHandler(_))
   def errorHandler: Option[PubSubErrorHandler] = errorListener.map(CogsUtils.errorHandler(_))
   def closeHandler: Option[PubSubCloseHandler] = closeListener.map(CogsUtils.closeHandler(_))

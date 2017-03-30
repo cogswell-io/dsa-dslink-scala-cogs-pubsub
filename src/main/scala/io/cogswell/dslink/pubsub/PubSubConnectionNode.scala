@@ -102,13 +102,11 @@ case class PubSubConnectionNode(
   }
   
   private def options: PubSubOptions = {
-    val opts = PubSubOptions(
+    var opts = PubSubOptions(
       closeListener = Some(closeHandler),
-      reconnectListener = Some(reconnectHandler)
+      reconnectListener = Some(reconnectHandler),
+      url = url
     )
-    
-    url.foreach(opts.withUrl(_))
-    
     opts
   }
 

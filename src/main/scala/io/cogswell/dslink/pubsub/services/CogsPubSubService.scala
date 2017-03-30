@@ -22,8 +22,13 @@ import com.gambit.sdk.pubsub.handlers.PubSubErrorResponseHandler
 import com.gambit.sdk.pubsub.handlers.PubSubRawRecordHandler
 
 object CogsPubSubService extends PubSubService {
+  val defaultUrl: String = "wss://api.cogswell.io/pubsub"
+
   private def translateOptions(options: PubSubOptions): CogsPubSubOptions = {
-    new CogsPubSubOptions(options.url, true, Duration.ofSeconds(30), null)
+    new CogsPubSubOptions(
+        options.url.getOrElse(defaultUrl),
+        true, Duration.ofSeconds(30), null
+    )
   }
   
   override def connect(

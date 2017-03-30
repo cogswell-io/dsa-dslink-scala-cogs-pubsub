@@ -27,6 +27,7 @@ import io.cogswell.dslink.pubsub.connection.PubSubConnection
 import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.Scheduler
+import io.cogswell.dslink.pubsub.services.CogsPubSubService
 
 case class PubSubRootNode(
     link: DSLink
@@ -88,7 +89,7 @@ case class PubSubRootNode(
     
     val connectAction = LinkUtils.action(Seq(
         ActionParam(NAME_PARAM, ValueType.STRING),
-        ActionParam(URL_PARAM, ValueType.STRING, Some(new Value("wss://api.cogswell.io/pubsub"))),
+        ActionParam(URL_PARAM, ValueType.STRING, Some(new Value(CogsPubSubService.defaultUrl))),
         ActionParam(READ_KEY_PARAM, ValueType.STRING, Some(new Value(""))),
         ActionParam(WRITE_KEY_PARAM, ValueType.STRING, Some(new Value("")))
     )) { actionData =>

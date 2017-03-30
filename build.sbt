@@ -16,7 +16,7 @@ run in Compile <<= Defaults.runTask(fullClasspath in Compile, mainClass in (Comp
 mappings in Universal += file("dslink.json") -> "dslink.json"
 
 libraryDependencies ++= Seq(
-  "org.scaldi" % "scaldi_2.11" % "0.5.8",
+  "org.scaldi" %% "scaldi" % "0.5.8",
   "org.iot-dsa" % "dslink" % "0.16.0",
   "io.cogswell" % "cogs-java-client-sdk" % "2.0.0",
   "joda-time" % "joda-time" % "2.9.7",
