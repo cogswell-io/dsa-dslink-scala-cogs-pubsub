@@ -27,6 +27,8 @@ import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import java.util.concurrent.TimeUnit
+import java.net.ConnectException
+import io.cogswell.dslink.pubsub.util.StringyException
 
 
 case class PubSubConnectionNode(
@@ -145,7 +147,12 @@ case class PubSubConnectionNode(
         
         map(CHANNEL_PARAM).value.map(_.getString) match {
           case Some(channel) => {
-            Await.result(addSubscriber(connectionNode, channel), Duration(30, TimeUnit.SECONDS))
+            Await.result(
+              addSubscriber(connectionNode, channel) transform (
+                {v => v}, {e => new StringyException(e)}
+              ), 
+              Duration(30, TimeUnit.SECONDS)
+            )
           }
           case None => {
             val message = "No channel supplied for new subscriber."
@@ -203,8 +210,7 @@ case class PubSubConnectionNode(
     connection match {
       case None => {
         logger.warn("No connection found when attempting to subscribe!")
-        // TODO [DGLOG-24]: handle no connection
-        Future.successful(Unit)
+        Future.failed(new ConnectException("Pub/Sub connection does not exist."))
       }
       case Some(conn) => {
         val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
@@ -229,7 +235,7 @@ case class PubSubConnectionNode(
     connection match {
       case None => {
         logger.warn("No connection found when attempting to setup publisher!")
-        // TODO [DGLOG-24]: handle no connection
+        throw new ConnectException("Pub/Sub connection does not exist.")
       }
       case Some(conn) => {
         val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
