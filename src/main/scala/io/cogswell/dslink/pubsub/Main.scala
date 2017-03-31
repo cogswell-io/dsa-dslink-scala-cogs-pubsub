@@ -15,7 +15,6 @@ object Main extends DSLinkHandler {
   private var rootNode: Node = _
 
   override val isResponder = true
-  override val isRequester = true
 
 // General handlers
   
@@ -25,41 +24,18 @@ object Main extends DSLinkHandler {
   }
   
   // Handle a failed subscription operation
-  /*
   override def onSubscriptionFail(path: String): Node = {
     logger.info(s"Subscription failed to path '${path}'")
-    rootNode
+    null
   }
-  // */
   
   // Handle a failed invocation operation
-  /*
   override def onInvocationFail(path: String): Node = {
     logger.info(s"Invocation failed for path '${path}'")
-    rootNode
+    null
   }
-  // */
   
 // Responder handlers
-  
-  /*
-  private def cogsResponderInitialized(link: DSLink): Unit = {
-    logger.info(s"Responder ${link.getPath} has been initialized")
-    val childName = "CogswellPubsub"
-    val childTitle = "Cogswell Pub/Sub"
-    
-    var value: Option[String] = None
-    
-    link.getNodeManager.getSuperRoot
-      .createChild(childName)
-      .setDisplayName(childTitle)
-      .setValueType(ValueType.STRING)
-      .setValue(new Value("") {
-        override def getType(): ValueType = ValueType.STRING
-        override def getString(): String = value.getOrElse(null)
-      })
-  }
-  */
   
   // Handle initialization of the Responder
   override def onResponderInitialized(link: DSLink): Unit = {
@@ -75,23 +51,6 @@ object Main extends DSLinkHandler {
   // Handle disconnection of the Responder
   override def onResponderDisconnected(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' disconnected")
-  }
-  
-// Requester handlers
-  
-  // Handle initialization of the Requester
-  override def onRequesterInitialized(link: DSLink): Unit = {
-    logger.info(s"Requester for path '${link.getPath}' has been initialized")
-  }
-  
-  // Handle connection of the Requester (happens after initialization)
-  override def onRequesterConnected(link: DSLink): Unit = {
-    logger.info(s"Requester for path '${link.getPath}' connected")
-  }
-  
-  // Handle disconnection of the Requester
-  override def onRequesterDisconnected(link: DSLink): Unit = {
-    logger.info(s"Requester for path '${link.getPath}' disconnected")
   }
   
   // Bootstrap the DSLink
