@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
 object Main extends DSLinkHandler {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private var rootNode: Node = _
+  private var pubSubNode = PubSubRootNode()
 
   override val isResponder = true
 
@@ -20,37 +20,39 @@ object Main extends DSLinkHandler {
   
   // Handle a failed set operation
   override def onSetFail(path: String, value: Value): Unit = {
-    logger.info(s"Failed to set path '${path}' to value ${value}")
+    logger.warn(s"Failed to set path '${path}' to value ${value}")
   }
   
   // Handle a failed subscription operation
   override def onSubscriptionFail(path: String): Node = {
-    logger.info(s"Subscription failed to path '${path}'")
+    logger.warn(s"Subscription failed to path '${path}'")
     null
   }
   
   // Handle a failed invocation operation
   override def onInvocationFail(path: String): Node = {
-    logger.info(s"Invocation failed for path '${path}'")
+    logger.warn(s"Invocation failed for path '${path}'")
     null
   }
   
 // Responder handlers
   
-  // Handle initialization of the Responder
-  override def onResponderInitialized(link: DSLink): Unit = {
-    logger.info(s"Responder for path '${link.getPath}' has been initialized")
-    val pubsubRoot = PubSubRootNode(link)
-  }
-  
   // Handle connection of the Responder (happens after initialization)
   override def onResponderConnected(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' connected")
+    pubSubNode.linkConnected(link)
+  }
+  
+  // Handle initialization of the Responder. This is called after onResponderConnected()!!
+  override def onResponderInitialized(link: DSLink): Unit = {
+    logger.info(s"Responder for path '${link.getPath}' has been initialized")
+    pubSubNode.linkReady(link)
   }
   
   // Handle disconnection of the Responder
   override def onResponderDisconnected(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' disconnected")
+    pubSubNode.linkDisconnected(link)
   }
   
   // Bootstrap the DSLink

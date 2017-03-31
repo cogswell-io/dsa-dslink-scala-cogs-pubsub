@@ -7,6 +7,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.collection.JavaConversions._
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
@@ -28,57 +29,47 @@ import io.cogswell.dslink.pubsub.util.Scheduler
 import io.cogswell.dslink.pubsub.services.CogsPubSubService
 import io.cogswell.dslink.pubsub.util.StringyException
 
-case class PubSubRootNode(
-    link: DSLink
-)(implicit ec: ExecutionContext) {
-  private lazy val manager: NodeManager = link.getNodeManager
-  private lazy val rootNode: Node = manager.getSuperRoot
-  
+case class PubSubRootNode() extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
+  
   private val connections = MutableMap[String, PubSubConnectionNode]()
   
-  private var numberSink: Option[(Number) => Unit] = None
-  private var connectNode: Node = _
-  
-  private def initNode(): Unit = {
-    // Random number generator
-    val randNode = rootNode
-      .createChild("RandomNumbers")
-      .setDisplayName("Random Numbers")
-      .setValueType(ValueType.NUMBER)
-      .setValue(new Value(Random.nextDouble()))
-      .build()
+  override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
+    val manager: NodeManager = link.getNodeManager
+    val rootNode = manager.getSuperRoot
     
-    Scheduler.repeat(Duration(500, TimeUnit.MILLISECONDS)) {
-      // Only update data if there are subscribers.
-      if (link.getSubscriptionManager.hasValueSub(randNode)) {
-        randNode.setValue(new Value(Random.nextDouble()))
+    def addConnection(
+        name: String,
+        metadata: Option[PubSubConnectionMetadata]
+    ): Future[Unit] = {
+      val connection = PubSubConnectionNode(rootNode, name, metadata)
+      connections(name) = connection
+      connection.linkReady(link) andThen {
+        case Success(_) => logger.info("Connected to the Pub/Sub service.")
+        case Failure(error) => {
+          logger.error("Error connecting to the Pub/Sub service:", error)
+          connection.destroy()
+        }
       }
     }
     
-    // Number logger
-    val loggerNode = rootNode
-      .createChild("NumberLogger")
-      .setDisplayName("Number Logger")
-      .setValueType(ValueType.NUMBER)
-      .setWritable(Writable.WRITE)
-      .build()
-
-    // Handle updates to the 
-    loggerNode.getListener.setValueHandler(new Handler[ValuePair]{
-      override def handle(pair: ValuePair): Unit = {
-        Option(pair.getCurrent).map(_.getNumber) match {
-          case Some(number) => numberSink.foreach(_(number))
-        }
+    // Synchronize connection nodes
+    {
+      val (childNodes, childKeys) = Option(rootNode.getChildren).fold(
+        (Map.empty[String, Node], Set.empty[String])
+      ) { nodeMap =>
+        (nodeMap.toMap, nodeMap.keySet.toSet)
       }
-    })
       
-    logger.info(s"link = $link")
-    logger.info(s"loggerNode = $loggerNode")
-
-    numberSink = Some({ number =>
-      logger.info(s"Received number: $number")
-    })
+      (childKeys ++ connections.keySet) map { name =>
+        (name, childNodes.containsKey(name), connections.contains(name))
+      } foreach {
+        case (name, false, true) => connections.remove(name) foreach { _.destroy() }
+        case (name, true, false) => addConnection(name, None)
+        case (name, true, true) => connections(name).linkReady(link)
+        case _ =>
+      }
+    }
     
     // Connect action
     val NAME_PARAM = "name"
@@ -99,15 +90,15 @@ case class PubSubRootNode(
       val readKey = map(READ_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
       val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
       
-      if(connections.keys.toSeq.contains(name)){
+      if (connections.keys.toSeq.contains(name)) {
         throw new IllegalArgumentException(s"Name $name already in use.")
       }
       
-      if(url.isEmpty){
+      if (url.isEmpty) {
         throw new IllegalArgumentException("Url must be provided.")
       }
       
-      if(readKey.isEmpty && writeKey.isEmpty){
+      if (readKey.isEmpty && writeKey.isEmpty) {
         throw new IllegalArgumentException("At least one key must be provided.");
       }
       
@@ -116,44 +107,29 @@ case class PubSubRootNode(
       logger.info(s"'${READ_KEY_PARAM}' : ${readKey}")
       logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
       logger.info(s"'${NAME_PARAM}' : ${name}")
-   
       
       Await.result(
-        addConnection(name, readKey, writeKey, url) transform({v => v}, {e => new StringyException(e)}),
+        addConnection(
+            name, Some(PubSubConnectionMetadata(readKey, writeKey, url))
+        ) transform({v => v}, {e => new StringyException(e)}),
         Duration(30, TimeUnit.SECONDS)
       )
       
       logger.info("Connection node should now exist")
     }
     
-    connectNode = rootNode
-      .createChild("connect")
-      .setDisplayName("Connect")
-      .setAction(connectAction)
-      .build()
-  }
-  
-  initNode()
-  
-  def destroy(): Unit = {
-    connections.foreach(_._2.destroy())
-    rootNode.removeChild(connectNode)
-  }
-  
-  private def addConnection(
-      name: String,
-      readKey: Option[String],
-      writeKey: Option[String],
-      url: Option[String]
-  ): Future[PubSubConnection] = {
-    val connection = PubSubConnectionNode(manager, rootNode, name, readKey, writeKey, url)
-    connections(name) = connection
-    connection.connect() andThen {
-      case Success(_) => logger.info("Connected to the Pub/Sub server.")
-      case Failure(error) => {
-        logger.error("Error connecting to the Pub/Sub service:", error)
-        connection.destroy()
-      }
-    }
+    val CONNECT_NODE_NAME = "connect"
+    val CONNECT_NODE_ALIAS = "Connect"
+    
+    Option(rootNode.getChild(CONNECT_NODE_NAME)) orElse {
+      Some(
+        rootNode
+        .createChild(CONNECT_NODE_NAME)
+        .setDisplayName(CONNECT_NODE_ALIAS)
+        .build()
+      )
+    } foreach { _ setAction connectAction }
+    
+    Future.successful()
   }
 }

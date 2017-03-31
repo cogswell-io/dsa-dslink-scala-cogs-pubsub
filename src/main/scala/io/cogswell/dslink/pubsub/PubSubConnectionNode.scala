@@ -4,7 +4,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 import org.dsa.iot.dslink.node.Node
-import org.dsa.iot.dslink.node.NodeManager
 import org.dsa.iot.dslink.node.value.ValueType
 import org.dsa.iot.dslink.node.actions.Action
 import org.dsa.iot.dslink.node.actions.Parameter
@@ -29,22 +28,24 @@ import scala.concurrent.duration.Duration
 import java.util.concurrent.TimeUnit
 import java.net.ConnectException
 import io.cogswell.dslink.pubsub.util.StringyException
+import org.dsa.iot.dslink.DSLink
 
+case class PubSubConnectionMetadata(
+    readKey: Option[String],
+    writeKey: Option[String],
+    url: Option[String]
+)
 
 case class PubSubConnectionNode(
-    manager: NodeManager,
     parentNode: Node,
     name: String,
-    readKey: Option[String] = None,
-    writeKey: Option[String] = None,
-    url: Option[String] = None
-)(implicit ec: ExecutionContext) {
+    metadata: Option[PubSubConnectionMetadata] = None
+)(implicit ec: ExecutionContext) extends PubSubNode {
   private val subscribers = MutableMap[String, PubSubSubscriberNode]()
   private val publishers = MutableMap[String, PubSubPublisherNode]()
   
-  private val keys: Seq[String] = Seq(readKey, writeKey).filter(_.isDefined).map(_.get)
   private var connection: Option[PubSubConnection] = None
-  private var connectionNode: Node = _
+  private var connectionNode: Option[Node] = None
   
   private val logger = LoggerFactory.getLogger(getClass)
   private var statusNode: Option[Node] = None
@@ -104,107 +105,124 @@ case class PubSubConnectionNode(
   }
   
   private def options: PubSubOptions = {
-    var opts = PubSubOptions(
+    PubSubOptions(
       closeListener = Some(closeHandler),
       reconnectListener = Some(reconnectHandler),
-      url = url
+      url = metadata.flatMap(_.url)
     )
-    opts
   }
 
-  private def initNode(): Unit = {
+  override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Initializing connection '$name'")
     
     val CHANNEL_PARAM = "channel"
     val MESSAGE_PARAM = "message"
     
     // Connection node
-    connectionNode = parentNode.createChild(name).build()
+    connectionNode = Option(parentNode getChild name) orElse {
+      Some(
+        parentNode
+        .createChild(name)
+        .setMetaData()
+        .build()
+      )
+    }
     
-    // Status indicator node
-    statusNode = Some(
-      connectionNode.createChild("Status")
-      .setValueType(ValueType.STRING)
-      .setValue(new Value("Unknown"))
-      .build()
-    )
-    
-    // Disconnect action node
-    val disconnectNode = connectionNode.createChild("Disconnect")
-      .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Closing connection '$name'")
-        parentNode.removeChild(connectionNode)
-        connection.foreach(_.disconnect())
-      })
-      .build()
-    
-    // Subscribe action node
-    val subscribeNode = connectionNode.createChild("Add Subscriber")
-      .setAction(LinkUtils.action(Seq(
-          ActionParam(CHANNEL_PARAM, ValueType.STRING)
-      )) { actionData =>
-        val map = actionData.dataMap
-        
-        map(CHANNEL_PARAM).value.map(_.getString) match {
-          case Some(channel) => {
-            Await.result(
-              addSubscriber(connectionNode, channel) transform (
-                {v => v}, {e => new StringyException(e)}
-              ), 
-              Duration(30, TimeUnit.SECONDS)
-            )
-          }
-          case None => {
-            val message = "No channel supplied for new subscriber."
-            logger.warn(message)
-            throw new IllegalArgumentException(message)
-          }
-        }
-      })
-      .build()
+    connectionNode foreach { cNode =>
+      // Status indicator node
+      statusNode = Option(cNode getChild "Status") orElse { 
+        Some(
+          cNode.createChild("Status")
+          .setValueType(ValueType.STRING)
+          .setValue(new Value("Unknown"))
+          .build()
+        )
+      }
       
-    // Publisher action node
-    val publisherNode = connectionNode.createChild("Add Publisher")
-      .setAction(LinkUtils.action(Seq(
-          ActionParam(CHANNEL_PARAM, ValueType.STRING)
-      )) { actionData =>
-        val map = actionData.dataMap
-
-        map(CHANNEL_PARAM).value.map(_.getString) match {
-          case Some(channel) => addPublisher(connectionNode, channel)
-          case None => {
-            val message = "No channel supplied for new publisher."
-            logger.warn(message)
-            throw new IllegalArgumentException(message)
+      // Disconnect action node
+      Option(cNode getChild "Disconnect") orElse {
+        Some(cNode createChild "Disconnect" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq()) { actionData =>
+          logger.info(s"Closing connection '$name'")
+          destroy()
+        })
+      }
+      
+      // Subscribe action node
+      Option(cNode getChild "Add Subscriber") orElse {
+        Some(cNode createChild "Add Subscriber" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq(
+            ActionParam(CHANNEL_PARAM, ValueType.STRING)
+        )) { actionData =>
+          val map = actionData.dataMap
+          
+          map(CHANNEL_PARAM).value.map(_.getString) match {
+            case Some(channel) => {
+              Await.result(
+                addSubscriber(link, cNode, channel) transform (
+                  {v => v}, {e => new StringyException(e)}
+                ), 
+                Duration(30, TimeUnit.SECONDS)
+              )
+            }
+            case None => {
+              val message = "No channel supplied for new subscriber."
+              logger.warn(message)
+              throw new IllegalArgumentException(message)
+            }
           }
-        }
-      })
-      .build()
+        })
+      }
+        
+      // Publisher action node
+      Option(cNode getChild "Add Publisher") orElse {
+        Some(cNode createChild "Add Publisher" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq(
+            ActionParam(CHANNEL_PARAM, ValueType.STRING)
+        )) { actionData =>
+          val map = actionData.dataMap
+
+          map(CHANNEL_PARAM).value.map(_.getString) match {
+            case Some(channel) => addPublisher(link, cNode, channel)
+            case None => {
+              val message = "No channel supplied for new publisher."
+              logger.warn(message)
+              throw new IllegalArgumentException(message)
+            }
+          }
+        })
+      }
+      
+      // Publish action
+      Option(cNode getChild "Publish") orElse {
+        Some(cNode createChild "Publish" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq(
+            ActionParam(CHANNEL_PARAM, ValueType.STRING),
+            ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
+        )) { actionData =>
+          val map = actionData.dataMap
+          val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
+
+          map(CHANNEL_PARAM).value.map(_.getString) match {
+            case Some(channel) => connection.foreach(_.publish(channel, message))
+            case _ => {
+              val message = "Missing channel and/or message for publish action."
+              logger.warn(message)
+              throw new IllegalArgumentException(message)
+            }
+          }
+        })
+      }
+    }
     
-    // Publish action
-    val publishNode = connectionNode.createChild("Publish")
-      .setAction(LinkUtils.action(Seq(
-          ActionParam(CHANNEL_PARAM, ValueType.STRING),
-          ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
-      )) { actionData =>
-        val map = actionData.dataMap
-        val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
-
-        map(CHANNEL_PARAM).value.map(_.getString) match {
-          case Some(channel) => connection.foreach(_.publish(channel, message))
-          case _ => {
-            val message = "Missing channel and/or message for publish action."
-            logger.warn(message)
-            throw new IllegalArgumentException(message)
-          }
-        }
-      })
-      .build()
+    connection.fold(connect()) { _ => Future.successful() }
   }
   
-  initNode()
-  
-  private def addSubscriber(parentNode: Node, channel: String): Future[Unit] = {
+  private def addSubscriber(link: DSLink, parentNode: Node, channel: String): Future[Unit] = {
     logger.info(s"Adding subscriber to channel '$channel'")
     
     connection match {
@@ -213,15 +231,17 @@ case class PubSubConnectionNode(
         Future.failed(new ConnectException("Pub/Sub connection does not exist."))
       }
       case Some(conn) => {
-        val subscriber = PubSubSubscriberNode(manager, parentNode, conn, channel)
+        val subscriber = PubSubSubscriberNode(parentNode, conn, channel)
         
-        subscriber.subscribe() andThen {
+        subscriber.subscribe() flatMap { _ =>
+          subscriber.linkReady(link)
+        } andThen {
           case Success(_) => {
-            logger.info(s"[$name] Succesfully subscribed to channel '$channel'")
+            logger.info(s"[$name] Succesfully added subscriber to channel '$channel'")
             subscribers.put(channel, subscriber)
           }
           case Failure(error) => {
-            logger.error(s"[$name] Error subscribing to channel '$channel':", error)
+            logger.error(s"[$name] Error adding subscriber to channel '$channel':", error)
             subscriber.destroy()
           }
         } map { _ => Unit }
@@ -229,7 +249,7 @@ case class PubSubConnectionNode(
     }
   }
   
-  private def addPublisher(parentNode: Node, channel: String): Unit = {
+  private def addPublisher(link: DSLink, parentNode: Node, channel: String): Unit = {
     logger.info(s"Adding publisher for channel '$channel'")
     
     connection match {
@@ -238,8 +258,17 @@ case class PubSubConnectionNode(
         throw new ConnectException("Pub/Sub connection does not exist.")
       }
       case Some(conn) => {
-        val publisher = PubSubPublisherNode(manager, parentNode, conn, channel)
-        publishers.put(channel, publisher)
+        val publisher = PubSubPublisherNode(parentNode, conn, channel)
+        publisher.linkReady(link) andThen {
+          case Success(_) => {
+            logger.info(s"[$name] Succesfully added publisher for channel '$channel'")
+            publishers.put(channel, publisher)
+          }
+          case Failure(error) => {
+            logger.error(s"[$name] Error adding publisher for channel '$channel':", error)
+            publisher.destroy()
+          }
+        }
       }
     }
   }
@@ -247,18 +276,21 @@ case class PubSubConnectionNode(
   def destroy(): Unit = {
     subscribers.foreach(_._2.destroy())
     publishers.foreach(_._2.destroy())
-
     connection.foreach(_.disconnect())
-    parentNode.removeChild(connectionNode)
+    connectionNode.foreach(parentNode.removeChild(_))
   }
   
-  def connect()(implicit ec: ExecutionContext): Future[PubSubConnection] = {
+  def connect()(implicit ec: ExecutionContext): Future[Unit] = {
+    val keys = metadata.fold(Seq.empty[String]) { m =>
+      Seq(m.readKey, m.writeKey) filter (_.isDefined) map (_.get)
+    }
+    
     Services.pubSubService.connect(keys, Some(options)) map { conn =>
       logger.info("Connected to the pub/sub service.")
       
       setStatus("Connected")
       connection = Some(conn)
-      conn
+      ()
     }
   }
 }

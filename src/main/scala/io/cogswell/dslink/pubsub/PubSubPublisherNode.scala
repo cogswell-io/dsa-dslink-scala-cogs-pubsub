@@ -16,21 +16,22 @@ import org.dsa.iot.dslink.node.value.ValuePair
 import org.dsa.iot.dslink.node.value.Value
 import scala.util.Failure
 import scala.util.Success
+import org.dsa.iot.dslink.DSLink
+import scala.concurrent.Future
 
 case class PubSubPublisherNode(
-    manager: NodeManager,
     parentNode: Node,
     connection: PubSubConnection,
     channel: String
-)(implicit ec: ExecutionContext) {
+)(implicit ec: ExecutionContext) extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
   private val messageSink: (String) => Unit = { message =>
     connection.publish(channel, message)
   }
 
-  private var publisherNode: Node = _
+  private var publisherNode: Option[Node] = None
   
-  private def initNode(): Unit = {
+  override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Initializing publisher node for '$channel'")
     
     val MESSAGE_PARAM = "message"
@@ -38,47 +39,57 @@ case class PubSubPublisherNode(
     val nodeAlias = s"Publisher [$channel]"
     
     // Connection node
-    publisherNode = parentNode
-      .createChild(nodeName)
-      .setDisplayName(nodeAlias)
-      .setWritable(Writable.WRITE)
-      .setValueType(ValueType.STRING)
-      .build()
+    publisherNode = Option(parentNode getChild nodeName) orElse {
+      Some(
+        parentNode.createChild(nodeName)
+        .setDisplayName(nodeAlias)
+        .setWritable(Writable.WRITE)
+        .setValueType(ValueType.STRING)
+        .build()
+      )
+    }
     
-    // Handle updates to the 
-    publisherNode.getListener.setValueHandler(new Handler[ValuePair]{
-      override def handle(pair: ValuePair): Unit = {
-        Option(pair.getCurrent).map(_.getString) match {
-          case Some(msg) => connection.publish(channel, msg)
+    publisherNode foreach { pNode =>
+      // Handle updates to the 
+      pNode.getListener.setValueHandler(new Handler[ValuePair]{
+        override def handle(pair: ValuePair): Unit = {
+          Option(pair.getCurrent).map(_.getString) match {
+            case Some(msg) => connection.publish(channel, msg)
+            case _ =>
+          }
         }
+      })
+      
+      // Disconnect action node
+      Option(pNode getChild "Remove Publisher") orElse {
+        Some(pNode createChild "Remove Publisher" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq()) { actionData =>
+          logger.info(s"Removing subscriber for channel '$channel'")
+          parentNode.removeChild(pNode)
+        })
       }
-    })
+      
+      // Publisher action node
+      Option(pNode getChild "Publish Message") orElse {
+        Some(pNode createChild "Publish Message" build)
+      } foreach {
+        _.setAction(LinkUtils.action(Seq(
+            ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
+        )) { actionData =>
+          val map = actionData.dataMap
+          val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
+          
+          connection.publish(channel, message)
+        })
+      }
+    }
     
-    // Disconnect action node
-    val removeNode = publisherNode.createChild("Remove Publisher")
-      .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Removing subscriber for channel '$channel'")
-        parentNode.removeChild(publisherNode)
-      })
-      .build()
-    
-    // Publisher action node
-    val publishNode = publisherNode.createChild("Publish Message")
-      .setAction(LinkUtils.action(Seq(
-          ActionParam(MESSAGE_PARAM, ValueType.STRING, Some(new Value("")))
-      )) { actionData =>
-        val map = actionData.dataMap
-        val message = map(MESSAGE_PARAM).value.map(_.getString).getOrElse("")
-        
-        connection.publish(channel, message)
-      })
-      .build()
+    Future.successful()
   }
   
-  initNode()
-
   def destroy(): Unit = {
-    parentNode.removeChild(publisherNode)
+    publisherNode.foreach(parentNode.removeChild(_))
     connection.unsubscribe(channel)
   }
 }
