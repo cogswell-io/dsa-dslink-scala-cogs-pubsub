@@ -2,32 +2,30 @@ package io.cogswell.dslink.pubsub
 
 import java.util.concurrent.TimeUnit
 
+import scala.collection.JavaConversions.asScalaSet
+import scala.collection.JavaConversions.mapAsJavaMap
+import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.mutable.{ Map => MutableMap }
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.collection.JavaConversions._
 import scala.util.Failure
-import scala.util.Random
 import scala.util.Success
 
 import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.node.NodeManager
-import org.dsa.iot.dslink.node.Writable
 import org.dsa.iot.dslink.node.value.Value
-import org.dsa.iot.dslink.node.value.ValuePair
 import org.dsa.iot.dslink.node.value.ValueType
-import org.dsa.iot.dslink.util.handler.Handler
 import org.slf4j.LoggerFactory
 
-import io.cogswell.dslink.pubsub.connection.PubSubConnection
+import io.cogswell.dslink.pubsub.model.PubSubConnectionMetadata
+import io.cogswell.dslink.pubsub.services.CogsPubSubService
 import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
-import io.cogswell.dslink.pubsub.util.Scheduler
-import io.cogswell.dslink.pubsub.services.CogsPubSubService
 import io.cogswell.dslink.pubsub.util.StringyException
+import io.cogswell.dslink.pubsub.util.StringUtils
 
 case class PubSubRootNode() extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -40,6 +38,7 @@ case class PubSubRootNode() extends PubSubNode {
     
     def addConnection(
         name: String,
+        alias: String,
         metadata: Option[PubSubConnectionMetadata]
     ): Future[Unit] = {
       val connection = PubSubConnectionNode(rootNode, name, metadata)
@@ -65,7 +64,10 @@ case class PubSubRootNode() extends PubSubNode {
         (name, childNodes.containsKey(name), connections.contains(name))
       } foreach {
         case (name, false, true) => connections.remove(name) foreach { _.destroy() }
-        case (name, true, false) => addConnection(name, None)
+        case (name, true, false) => {
+          val alias = StringUtils trim name through ':'
+          addConnection(name, alias, None)
+        }
         case (name, true, true) => connections(name).linkReady(link)
         case _ =>
       }
@@ -108,9 +110,11 @@ case class PubSubRootNode() extends PubSubNode {
       logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
       logger.info(s"'${NAME_PARAM}' : ${name}")
       
+      val connectionName = s"connection:$name"
+      
       Await.result(
         addConnection(
-            name, Some(PubSubConnectionMetadata(readKey, writeKey, url))
+            connectionName, name, Some(PubSubConnectionMetadata(readKey, writeKey, url))
         ) transform({v => v}, {e => new StringyException(e)}),
         Duration(30, TimeUnit.SECONDS)
       )

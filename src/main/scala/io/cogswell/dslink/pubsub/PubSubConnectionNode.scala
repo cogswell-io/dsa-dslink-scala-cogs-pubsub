@@ -1,40 +1,29 @@
 package io.cogswell.dslink.pubsub
 
+import java.net.ConnectException
+import java.util.concurrent.TimeUnit
+
+import scala.collection.mutable.{ Map => MutableMap }
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import scala.util.Failure
+import scala.util.Success
 
+import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.node.Node
+import org.dsa.iot.dslink.node.value.Value
 import org.dsa.iot.dslink.node.value.ValueType
-import org.dsa.iot.dslink.node.actions.Action
-import org.dsa.iot.dslink.node.actions.Parameter
-import org.dsa.iot.dslink.node.actions.ActionResult
-import org.dsa.iot.dslink.node.Permission
-import org.dsa.iot.dslink.util.handler.Handler
-
 import org.slf4j.LoggerFactory
 
 import io.cogswell.dslink.pubsub.connection.PubSubConnection
-import io.cogswell.dslink.pubsub.services.Services
 import io.cogswell.dslink.pubsub.model.PubSubOptions
-import io.cogswell.dslink.pubsub.util.LinkUtils
+import io.cogswell.dslink.pubsub.model.PubSubConnectionMetadata
+import io.cogswell.dslink.pubsub.services.Services
 import io.cogswell.dslink.pubsub.util.ActionParam
-import scala.collection.mutable.{Map => MutableMap}
-import scala.util.Failure
-import scala.util.Success
-import org.dsa.iot.dslink.node.value.Value
-import io.cogswell.dslink.pubsub.subscriber.PubSubSubscriber
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-import java.util.concurrent.TimeUnit
-import java.net.ConnectException
+import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.StringyException
-import org.dsa.iot.dslink.DSLink
-
-case class PubSubConnectionMetadata(
-    readKey: Option[String],
-    writeKey: Option[String],
-    url: Option[String]
-)
 
 case class PubSubConnectionNode(
     parentNode: Node,
@@ -120,12 +109,15 @@ case class PubSubConnectionNode(
     
     // Connection node
     connectionNode = Option(parentNode getChild name) orElse {
-      Some(
-        parentNode
-        .createChild(name)
-        .setMetaData()
-        .build()
-      )
+      Some {
+        val builder = parentNode createChild name
+        
+        metadata.foreach { md =>
+          builder.setMetaData(md.toJson.toString)
+        }
+        
+        builder build
+      }
     }
     
     connectionNode foreach { cNode =>

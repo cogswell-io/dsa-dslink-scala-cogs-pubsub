@@ -5,7 +5,7 @@ import scaldi.Injectable
 import java.time.Instant
 import org.joda.time.DateTime
 
-class TimeUtilsTest extends DslinkTest() with Injectable {
+class TimeUtilsTest extends DslinkTest() {
   "TimeUtils" should "correctly convert the epoch to a DateTime" in {
     val epochInstant = Instant.EPOCH
     val convertedDateTime = TimeUtils.instantToDateTime(epochInstant)
