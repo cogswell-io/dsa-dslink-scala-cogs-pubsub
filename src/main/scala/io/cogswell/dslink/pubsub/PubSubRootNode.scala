@@ -23,7 +23,6 @@ import io.cogswell.dslink.pubsub.services.CogsPubSubService
 import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.StringyException
-import io.cogswell.dslink.pubsub.util.StringUtils
 import io.cogswell.dslink.pubsub.model.NameKey
 import io.cogswell.dslink.pubsub.model.ConnectionNodeName
 import io.cogswell.dslink.pubsub.model.LinkNodeName
@@ -31,6 +30,7 @@ import io.cogswell.dslink.pubsub.model.ActionNodeName
 import io.cogswell.dslink.pubsub.model.NameKey
 import io.cogswell.dslink.pubsub.model.ActionNodeName
 import io.cogswell.dslink.pubsub.model.ConnectionNodeName
+
 
 case class PubSubRootNode() extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -60,12 +60,13 @@ case class PubSubRootNode() extends PubSubNode {
     {
       val nodeKeys = Option(rootNode.getChildren)
       .fold(Map.empty[String, Node])(_.toMap)
-      .keySet filter {
-        _.startsWith("connection:")
-      } map { key => 
-        val name = StringUtils trim key through ':'
-        ConnectionNodeName(name).key
-      }
+      .keySet map {
+        LinkNodeName.fromNodeId(_)
+      } map {
+        // We are only interested in connection nodes
+        case Some(name: ConnectionNodeName) => Some(name.key)
+        case _ => None
+      } filter { _.isDefined } map { _.get }
       
       (nodeKeys ++ connections.keySet) map { key =>
         (key, nodeKeys.contains(key), connections.containsKey(key))

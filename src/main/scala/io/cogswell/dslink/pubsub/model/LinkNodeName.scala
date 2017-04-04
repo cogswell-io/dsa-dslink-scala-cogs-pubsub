@@ -1,8 +1,8 @@
 package io.cogswell.dslink.pubsub.model
 
+import scala.collection.immutable.StringOps
 import io.cogswell.dslink.pubsub.util.SetOnce
 import org.dsa.iot.dslink.node.Node
-import io.cogswell.dslink.pubsub.util.StringUtils
 
 /**
  * Parent class of all node names. A way to represent a link node,
@@ -81,11 +81,15 @@ object LinkNodeName {
    * 
    * @return an Option which will contain the node name if it can be identified
    */
-  def fromNodeId(id: String, alias: String): Option[LinkNodeName] = {
+  def fromNodeId(id: String, alias: String = null): Option[LinkNodeName] = {
     Option(id) map {
-      StringUtils.split(_).onFirst(':')
-    } filter { case (category, name) =>
-      (!category.isEmpty) && (!name.isEmpty)
+      _.split(":", 2).toList
+    } flatMap {
+      case (category :: name :: Nil) => Some((category, name))
+      case _ => None
+    } filter {
+      case (category, name) => (!category.isEmpty) && (!name.isEmpty)
+      case _ => false
     } map { parts =>
       val (category, name) = parts
       (category, name, Option(alias).filter(!_.isEmpty).getOrElse(name))

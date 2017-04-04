@@ -32,7 +32,6 @@ import io.cogswell.dslink.pubsub.model.InfoNodeName
 import io.cogswell.dslink.pubsub.model.ActionNodeName
 import io.cogswell.dslink.pubsub.model.PublisherNodeName
 import io.cogswell.dslink.pubsub.model.SubscriberNodeName
-import io.cogswell.dslink.pubsub.util.StringUtils
 
 case class PubSubConnectionNode(
     parentNode: Node,
@@ -116,13 +115,16 @@ case class PubSubConnectionNode(
   private def restoreSubscribers(link: DSLink): Unit = {
     // Synchronize connection nodes with map of nodes.
     {
-      val nodeKeys = parentNode.getChildren.toMap.keySet filter {
-        _.startsWith("subscriber:")
-      } map { key => 
-        val channel = StringUtils trim key through ':'
-        SubscriberNodeName(channel).key
-      }
-      
+      val nodeKeys = Option(parentNode.getChildren)
+      .fold(Map.empty[String, Node])(_.toMap)
+      .keySet map {
+        LinkNodeName.fromNodeId(_)
+      } map {
+        // We are only interested in subscriber nodes
+        case Some(name: SubscriberNodeName) => Some(name.key)
+        case _ => None
+      } filter { _.isDefined } map { _.get }
+
       (nodeKeys ++ subscribers.keySet) map { key =>
         (key.name, nodeKeys.contains(key), subscribers.containsKey(key))
       } foreach {
