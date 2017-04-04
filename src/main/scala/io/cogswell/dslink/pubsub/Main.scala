@@ -37,6 +37,29 @@ object Main extends DSLinkHandler {
   
 // Responder handlers
   
+  /**
+   * Responder nodes:
+   * 
+   * - cogswell-pubsub
+   *   - [A] Add Connection (action:add-connection)
+   *   - [S] Connection[<connection-name>] connection:<connection-name>
+   *     - {Metadata}
+   *       - keys (at least one must be defined, and identities must match)
+   *       - URL (optional)
+   *     - [A] Disconnect (action:disconnect)
+   *     - [A] Add Subscriber (action:add-subscriber) | Only with R- key
+   *     - [A] Add Publisher (action:add-publisher) | Only with W- key
+   *     - [A] Publish (action:publish) | Only with W- key
+   *     - [I] Status (info:status)
+   *     - [S] Subscriber[<channel-name>] (subscriber:<channel-name>)
+   *       - [A] Unsubscribe (action:remove-subscriber)
+   *       - [A] Publish (action:publish) | Only with W- key
+   *     - Publisher[<channel-name>] (publisher:<channel-name>)
+   *       - [A] Remove Publisher (action:remove-publisher)
+   *       - [A] Publish (action:publish) | Only with W- key
+   * 
+   */
+  
   // Handle connection of the Responder (happens after initialization)
   override def onResponderConnected(link: DSLink): Unit = {
     logger.info(s"Responder for path '${link.getPath}' connected")

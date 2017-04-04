@@ -16,6 +16,8 @@ import org.dsa.iot.dslink.methods.responses.ListResponse
 import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.methods.requests.ListRequest
+import org.dsa.iot.dslink.node.NodeBuilder
+import io.cogswell.dslink.pubsub.model.LinkNodeName
 
 /**
  * Class representing a parameter attached to an Action.
@@ -114,5 +116,27 @@ object LinkUtils {
     }
 
     link.getRequester.list(listRequest, listHandler)
+  }
+  
+  /**
+   * Fetch the child of another node or create it if it doesn't exist.
+   * 
+   * @param parent the node to which the child should be attached
+   * @param name the name (id and alias) of the child node
+   * @param initializer an optional mutator for the builder after it has been
+   * created, but before it has been built
+   * 
+   * @return the child Node
+   */
+  def getOrMakeNode(
+      parent: Node,
+      name: LinkNodeName, 
+      initializer: Option[(NodeBuilder) => Unit] = None
+  ): Node = {
+    Option(parent getChild name.id) getOrElse {
+      val child = parent createChild name.id setDisplayName name.alias
+      initializer foreach (_(child))
+      child build
+    }
   }
 }

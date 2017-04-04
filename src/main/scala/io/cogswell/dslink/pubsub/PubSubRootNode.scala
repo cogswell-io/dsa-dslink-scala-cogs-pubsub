@@ -2,9 +2,7 @@ package io.cogswell.dslink.pubsub
 
 import java.util.concurrent.TimeUnit
 
-import scala.collection.JavaConversions.asScalaSet
-import scala.collection.JavaConversions.mapAsJavaMap
-import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.JavaConversions._
 import scala.collection.mutable.{ Map => MutableMap }
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
@@ -26,23 +24,29 @@ import io.cogswell.dslink.pubsub.util.ActionParam
 import io.cogswell.dslink.pubsub.util.LinkUtils
 import io.cogswell.dslink.pubsub.util.StringyException
 import io.cogswell.dslink.pubsub.util.StringUtils
+import io.cogswell.dslink.pubsub.model.NameKey
+import io.cogswell.dslink.pubsub.model.ConnectionNodeName
+import io.cogswell.dslink.pubsub.model.LinkNodeName
+import io.cogswell.dslink.pubsub.model.ActionNodeName
+import io.cogswell.dslink.pubsub.model.NameKey
+import io.cogswell.dslink.pubsub.model.ActionNodeName
+import io.cogswell.dslink.pubsub.model.ConnectionNodeName
 
 case class PubSubRootNode() extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
   
-  private val connections = MutableMap[String, PubSubConnectionNode]()
+  private val connections = MutableMap[NameKey, PubSubConnectionNode]()
   
   override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
     val manager: NodeManager = link.getNodeManager
     val rootNode = manager.getSuperRoot
     
     def addConnection(
-        name: String,
-        alias: String,
+        name: LinkNodeName,
         metadata: Option[PubSubConnectionMetadata]
     ): Future[Unit] = {
       val connection = PubSubConnectionNode(rootNode, name, metadata)
-      connections(name) = connection
+      connections(name.key) = connection
       connection.linkReady(link) andThen {
         case Success(_) => logger.info("Connected to the Pub/Sub service.")
         case Failure(error) => {
@@ -52,23 +56,23 @@ case class PubSubRootNode() extends PubSubNode {
       }
     }
     
-    // Synchronize connection nodes
+    // Synchronize connection nodes with map of nodes.
     {
-      val (childNodes, childKeys) = Option(rootNode.getChildren).fold(
-        (Map.empty[String, Node], Set.empty[String])
-      ) { nodeMap =>
-        (nodeMap.toMap, nodeMap.keySet.toSet)
+      val nodeKeys = Option(rootNode.getChildren)
+      .fold(Map.empty[String, Node])(_.toMap)
+      .keySet filter {
+        _.startsWith("connection:")
+      } map { key => 
+        val name = StringUtils trim key through ':'
+        ConnectionNodeName(name).key
       }
       
-      (childKeys ++ connections.keySet) map { name =>
-        (name, childNodes.containsKey(name), connections.contains(name))
+      (nodeKeys ++ connections.keySet) map { key =>
+        (key, nodeKeys.contains(key), connections.containsKey(key))
       } foreach {
-        case (name, false, true) => connections.remove(name) foreach { _.destroy() }
-        case (name, true, false) => {
-          val alias = StringUtils trim name through ':'
-          addConnection(name, alias, None)
-        }
-        case (name, true, true) => connections(name).linkReady(link)
+        case (key, false, true) => connections.remove(key) foreach { _.destroy() }
+        case (key, true, false) => addConnection(key.name, None)
+        case (key, true, true) => connections(key).linkReady(link)
         case _ =>
       }
     }
@@ -87,13 +91,20 @@ case class PubSubRootNode() extends PubSubNode {
     )) { actionData =>
       val map = actionData.dataMap
       
-      val name = map(NAME_PARAM).value.map(_.getString).getOrElse("")
+      val alias = map(NAME_PARAM).value.map(_.getString).getOrElse("")
       val url = map(URL_PARAM).value.map(_.getString).filter(!_.isEmpty)
       val readKey = map(READ_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
       val writeKey = map(WRITE_KEY_PARAM).value.map(_.getString).filter(!_.isEmpty)
+      val name = ConnectionNodeName(alias)
+      
+      logger.info(s"Clicked Invoke to Create a Connection")
+      logger.debug(s"'${URL_PARAM}' : ${url}")
+      logger.debug(s"'${READ_KEY_PARAM}' : ${readKey}")
+      logger.debug(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
+      logger.debug(s"'${NAME_PARAM}' : ${alias}")
       
       if (connections.keys.toSeq.contains(name)) {
-        throw new IllegalArgumentException(s"Name $name already in use.")
+        throw new IllegalArgumentException(s"Name $alias already in use.")
       }
       
       if (url.isEmpty) {
@@ -104,17 +115,9 @@ case class PubSubRootNode() extends PubSubNode {
         throw new IllegalArgumentException("At least one key must be provided.");
       }
       
-      logger.info(s"Clicked Invoke to Create a Connection")
-      logger.info(s"'${URL_PARAM}' : ${url}")
-      logger.info(s"'${READ_KEY_PARAM}' : ${readKey}")
-      logger.info(s"'${WRITE_KEY_PARAM}' : ${writeKey}")
-      logger.info(s"'${NAME_PARAM}' : ${name}")
-      
-      val connectionName = s"connection:$name"
-      
       Await.result(
         addConnection(
-            connectionName, name, Some(PubSubConnectionMetadata(readKey, writeKey, url))
+            name, Some(PubSubConnectionMetadata(readKey, writeKey, url))
         ) transform({v => v}, {e => new StringyException(e)}),
         Duration(30, TimeUnit.SECONDS)
       )
@@ -122,17 +125,9 @@ case class PubSubRootNode() extends PubSubNode {
       logger.info("Connection node should now exist")
     }
     
-    val CONNECT_NODE_NAME = "connect"
-    val CONNECT_NODE_ALIAS = "Connect"
-    
-    Option(rootNode.getChild(CONNECT_NODE_NAME)) orElse {
-      Some(
-        rootNode
-        .createChild(CONNECT_NODE_NAME)
-        .setDisplayName(CONNECT_NODE_ALIAS)
-        .build()
-      )
-    } foreach { _ setAction connectAction }
+    LinkUtils.getOrMakeNode(
+        rootNode, ActionNodeName("add-connection", "Add Connection")
+    ) setAction connectAction
     
     Future.successful()
   }
