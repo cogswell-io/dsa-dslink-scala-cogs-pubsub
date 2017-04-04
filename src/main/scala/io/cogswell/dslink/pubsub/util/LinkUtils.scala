@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
+import scala.collection.JavaConversions._
 import org.dsa.iot.dslink.node.actions.Action
 import org.dsa.iot.dslink.node.actions.Action
 import org.dsa.iot.dslink.node.value.Value
@@ -18,6 +19,7 @@ import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.methods.requests.ListRequest
 import org.dsa.iot.dslink.node.NodeBuilder
 import io.cogswell.dslink.pubsub.model.LinkNodeName
+import java.net.URLDecoder
 
 /**
  * Class representing a parameter attached to an Action.
@@ -138,5 +140,35 @@ object LinkUtils {
       initializer foreach (_(child))
       child build
     }
+  }
+  
+  /**
+   * Node names are URL encoded, so they need to be decoded before we perform any
+   * manipulation based on the name's original content. This functions performs
+   * the appropriate decoding to restore the name to its original form.
+   * 
+   * @param nodeName the possibly encoded node name
+   * 
+   * @return the decoded node name
+   */
+  def decodeNodeName(nodeName: String): String = URLDecoder.decode(nodeName, "UTF-8")
+  
+  /**
+   * Fetches the name from a node and decodes it.
+   * 
+   * @param the node whose name should be fetched
+   * 
+   * @return the decoded node name
+   */
+  def getNodeName(node: Node): String = decodeNodeName(node.getName)
+  
+  /**
+   * Fetches child nodes from a node, decodes their names, and  translates
+   * to a native Scala map.
+   */
+  def getNodeChildren(node: Node): Map[String, Node] = {
+    Option(node.getChildren())
+    .fold(Map.empty[String, Node])(_.toMap)
+    .map(pair => (decodeNodeName(pair._1), pair._2))
   }
 }

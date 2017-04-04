@@ -35,7 +35,7 @@ import io.cogswell.dslink.pubsub.model.SubscriberNodeName
 
 case class PubSubConnectionNode(
     parentNode: Node,
-    name: LinkNodeName,
+    connectionName: ConnectionNodeName,
     metadata: Option[PubSubConnectionMetadata] = None
 )(implicit ec: ExecutionContext) extends PubSubNode {
   private val subscribers = MutableMap[NameKey, PubSubSubscriberNode]()
@@ -48,7 +48,7 @@ case class PubSubConnectionNode(
   private var statusNode: Option[Node] = None
 
   private def setStatus(status: String): Unit = {
-    logger.info(s"Setting status to '$status' for connection '${name.alias}'")
+    logger.info(s"Setting status to '$status' for connection '${connectionName.alias}'")
     statusNode.foreach(_.setValue(new Value(status)))
   }
   
@@ -113,57 +113,109 @@ case class PubSubConnectionNode(
   }
   
   private def restoreSubscribers(link: DSLink): Unit = {
-    // Synchronize connection nodes with map of nodes.
+    logger.info(s"Restoring subscribers for connection ${connectionName}")
+
+    // Synchronize subscriber nodes with map of nodes.
     {
-      val nodeKeys = Option(parentNode.getChildren)
-      .fold(Map.empty[String, Node])(_.toMap)
-      .keySet map {
+      val nodeKeys = connectionNode
+      .map(node => LinkUtils.getNodeChildren(node))
+      .fold(Set.empty[String])(_.keySet) map {
         LinkNodeName.fromNodeId(_)
       } map {
         // We are only interested in subscriber nodes
-        case Some(name: SubscriberNodeName) => Some(name.key)
+        case Some(subscriberName: SubscriberNodeName) => Some(subscriberName.key)
         case _ => None
       } filter { _.isDefined } map { _.get }
 
       (nodeKeys ++ subscribers.keySet) map { key =>
         (key.name, nodeKeys.contains(key), subscribers.containsKey(key))
       } foreach {
-        case (name: SubscriberNodeName, false, true) =>
-          subscribers.remove(name.key) foreach { _.destroy() }
-        case (name: SubscriberNodeName, true, false) =>
-          addSubscriber(link, parentNode, name)
-        case (name: SubscriberNodeName, true, true) =>
-          subscribers(name.key).linkReady(link)
+        case (subscriberName: SubscriberNodeName, false, true) =>
+          subscribers.remove(subscriberName.key) foreach { _.destroy() }
+        case (subscriberName: SubscriberNodeName, true, false) =>
+          addSubscriber(link, parentNode, subscriberName)
+        case (subscriberName: SubscriberNodeName, true, true) =>
+          subscribers(subscriberName.key).linkReady(link)
         case t =>
           logger.warn(s"Bad state for subscriber: $t")
       }
     }
   }
   
-  private def restorePublishers(): Unit = {
-    
+  private def restorePublishers(link: DSLink): Unit = {
+    logger.info(s"Restoring publishers for connection ${connectionName}")
+
+    // Synchronize publisher nodes with map of nodes.
+    {
+      val nodeKeys = connectionNode
+      .map(node => LinkUtils.getNodeChildren(node))
+      .fold(Set.empty[String])(_.keySet) map {
+        LinkNodeName.fromNodeId(_)
+      } map {
+        // We are only interested in publisher nodes
+        case Some(publisherName: PublisherNodeName) => Some(publisherName.key)
+        case _ => None
+      } filter { _.isDefined } map { _.get }
+
+      (nodeKeys ++ subscribers.keySet) map { key =>
+        (key.name, nodeKeys.contains(key), subscribers.containsKey(key))
+      } foreach {
+        case (publisherName: PublisherNodeName, false, true) =>
+          subscribers.remove(publisherName.key) foreach { _.destroy() }
+        case (publisherName: PublisherNodeName, true, false) =>
+          addPublisher(link, parentNode, publisherName)
+        case (publisherName: PublisherNodeName, true, true) =>
+          subscribers(publisherName.key).linkReady(link)
+        case t =>
+          logger.warn(s"Bad state for subscriber: $t")
+      }
+    }
   }
   
-  private def options: PubSubOptions = {
+  private lazy val connectionMetadata: Option[PubSubConnectionMetadata] = {
+    metadata orElse {
+      logger.info("Metadata is not populated. Fetching from node.")
+      
+      connectionNode flatMap { node =>
+        Option(node.getMetaData[String]())
+      } flatMap { json =>
+        logger.info(s"Metadata from the node: $json")
+        
+        PubSubConnectionMetadata.parse(json) match {
+          case Success(md) => {
+            logger.info(s"Parsed metadata from the node: $md")
+            Some(md)
+          }
+          case Failure(error) => {
+            logger.error("Failed to parse metadata from the node.", error)
+            None
+          }
+        }
+      }
+    }
+  }
+  
+  private lazy val connectionOptions: PubSubOptions = {
     PubSubOptions(
       closeListener = Some(closeHandler),
       reconnectListener = Some(reconnectHandler),
-      url = metadata.flatMap(_.url)
+      url = connectionMetadata.flatMap(_.url)
     )
   }
 
   override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Initializing connection '${name.alias}'")
+    logger.info(s"Initializing connection '${connectionName.alias}'")
     
     val CHANNEL_PARAM = "channel"
     val MESSAGE_PARAM = "message"
     
     // Connection node
     connectionNode = Some(LinkUtils.getOrMakeNode(
-        parentNode, name,
-        Some { builder =>
-          metadata.foreach { builder setMetaData _.toJson.toString }
-        }
+      parentNode, connectionName,
+      Some { builder =>
+        logger.info(s"Writing connection metadata: $connectionMetadata")
+        connectionMetadata foreach { builder setMetaData _.toJson.toString }
+      }
     ))
     
     connectionNode foreach { cNode =>
@@ -179,7 +231,7 @@ case class PubSubConnectionNode(
       // Disconnect action node
       LinkUtils.getOrMakeNode(cNode, ActionNodeName("remove-connection", "Remove Connection"))
       .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Closing connection '$name'")
+        logger.info(s"Closing connection '$connectionName'")
         destroy()
       })
       
@@ -244,7 +296,12 @@ case class PubSubConnectionNode(
       })
     }
     
-    connection.fold(connect()) { _ => Future.successful() }
+    connection.fold(connect())(_ => Future.successful()) map { _ =>
+      restoreSubscribers(link)
+      restorePublishers(link)
+      
+      ()
+    }
   }
   
   private def addSubscriber(
@@ -265,11 +322,11 @@ case class PubSubConnectionNode(
           subscriber.linkReady(link)
         } andThen {
           case Success(_) => {
-            logger.info(s"[$name] Succesfully added subscriber to channel '${channel}'")
+            logger.info(s"[$connectionName] Succesfully added subscriber to channel '${channel}'")
             subscribers.put(subscriberName.key, subscriber)
           }
           case Failure(error) => {
-            logger.error(s"[$name] Error adding subscriber to channel '${channel}':", error)
+            logger.error(s"[$connectionName] Error adding subscriber to channel '${channel}':", error)
             subscriber.destroy()
           }
         } map { _ => Unit }
@@ -292,11 +349,11 @@ case class PubSubConnectionNode(
         val publisher = PubSubPublisherNode(parentNode, conn, publisherName)
         publisher.linkReady(link) andThen {
           case Success(_) => {
-            logger.info(s"[$name] Succesfully added publisher for channel '$channel'")
+            logger.info(s"[$connectionName] Succesfully added publisher for channel '$channel'")
             publishers.put(publisherName.key, publisher)
           }
           case Failure(error) => {
-            logger.error(s"[$name] Error adding publisher for channel '$channel':", error)
+            logger.error(s"[$connectionName] Error adding publisher for channel '$channel':", error)
             publisher.destroy()
           }
         }
@@ -312,11 +369,11 @@ case class PubSubConnectionNode(
   }
   
   def connect()(implicit ec: ExecutionContext): Future[Unit] = {
-    val keys = metadata.fold(Seq.empty[String]) { m =>
+    val keys = connectionMetadata.fold(Seq.empty[String]) { m =>
       Seq(m.readKey, m.writeKey) filter (_.isDefined) map (_.get)
     }
     
-    Services.pubSubService.connect(keys, Some(options)) map { conn =>
+    Services.pubSubService.connect(keys, Some(connectionOptions)) map { conn =>
       logger.info("Connected to the pub/sub service.")
       
       setStatus("Connected")

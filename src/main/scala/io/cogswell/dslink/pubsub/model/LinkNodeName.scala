@@ -3,6 +3,7 @@ package io.cogswell.dslink.pubsub.model
 import scala.collection.immutable.StringOps
 import io.cogswell.dslink.pubsub.util.SetOnce
 import org.dsa.iot.dslink.node.Node
+import java.net.URLDecoder
 
 /**
  * Parent class of all node names. A way to represent a link node,
@@ -112,6 +113,8 @@ object LinkNodeName {
    * @return the link name, typed appropriately for the supplied node
    */
   def fromNode(node: Node): Option[LinkNodeName] = {
-    fromNodeId(node.getName, node.getDisplayName)
+    val id = URLDecoder.decode(node.getName, "UTF-8")
+    val alias = node.getDisplayName
+    fromNodeId(id, alias)
   }
 }
