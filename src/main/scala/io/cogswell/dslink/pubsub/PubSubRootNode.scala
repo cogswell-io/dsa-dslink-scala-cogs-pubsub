@@ -42,6 +42,8 @@ case class PubSubRootNode() extends PubSubNode {
     val manager: NodeManager = link.getNodeManager
     val rootNode = manager.getSuperRoot
     
+    rootNode.setSerializable(false)
+    
     // Connect action
     val NAME_PARAM = "name"
     val URL_PARAM = "url"
@@ -107,19 +109,22 @@ case class PubSubRootNode() extends PubSubNode {
     }
     
     LinkUtils.getOrMakeNode(
-        rootNode, ActionNodeName("add-connection", "Add Connection")
+        rootNode, ActionNodeName("add-connection", "Add Connection"),
+        Some { builder =>
+          //builder.setSerializable(false)
+        }
     ) setAction connectAction
     
     // Synchronize connection nodes with map of nodes.
     {
       rootNode.getChildren().toMap foreach { case (name, node) =>
-        logger.info(s"Raw name from key:  ${name}")
-        logger.info(s"Raw name from node: ${node.getName}")
+        logger.debug(s"Raw name from key:  ${name}")
+        logger.debug(s"Raw name from node: ${node.getName}")
       }
       
       val nodeKeys = LinkUtils.getNodeChildren(rootNode)
       .keySet map { nodeId =>
-        logger.info(s"Assembling name for node '$nodeId'")
+        logger.debug(s"Assembling name for node '$nodeId'")
         LinkNodeName.fromNodeId(nodeId)
       } map {
         // We are only interested in connection nodes

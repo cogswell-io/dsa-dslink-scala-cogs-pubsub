@@ -22,20 +22,20 @@ import io.cogswell.dslink.pubsub.model.ActionNodeName
 case class PubSubSubscriberNode(
     parentNode: Node,
     connection: PubSubConnection,
-    name: SubscriberNodeName
+    subscriberName: SubscriberNodeName
 )(implicit ec: ExecutionContext) extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
   private var messageSource: Option[(PubSubMessage) => Unit] = None
   private var subscriberNode: Option[Node] = None
-  private lazy val channel = name.channel
+  private lazy val channel = subscriberName.channel
   
   override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Initializing subscriber node for '$channel'")
+    logger.info(s"Initializing subscriber $subscriberName")
     
     val MESSAGE_PARAM = "message"
     
     subscriberNode = Some(LinkUtils.getOrMakeNode(
-        parentNode, name,
+        parentNode, subscriberName,
         Some { _
           .setWritable(Writable.NEVER)
           .setValueType(ValueType.STRING)
@@ -47,10 +47,12 @@ case class PubSubSubscriberNode(
     })
     
     subscriberNode foreach { sNode =>
+      logger.info(s"Configuring actions for subscriber $subscriberName")
+      
       // Disconnect action node
       LinkUtils.getOrMakeNode(sNode, ActionNodeName("remove-subscriber", "Remove Subscriber"))
       .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Removing subscriber for channel '$channel'")
+        logger.info(s"Removing subscriber $subscriberName")
         // TODO: unsubscribe from pub/sub service
         parentNode.removeChild(sNode)
       })

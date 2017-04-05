@@ -32,6 +32,7 @@ import io.cogswell.dslink.pubsub.model.InfoNodeName
 import io.cogswell.dslink.pubsub.model.ActionNodeName
 import io.cogswell.dslink.pubsub.model.PublisherNodeName
 import io.cogswell.dslink.pubsub.model.SubscriberNodeName
+import org.slf4j.Marker
 
 case class PubSubConnectionNode(
     parentNode: Node,
@@ -46,6 +47,8 @@ case class PubSubConnectionNode(
   
   private val logger = LoggerFactory.getLogger(getClass)
   private var statusNode: Option[Node] = None
+
+  private val METADATA_NODE_NAME = InfoNodeName("metadata", "Metadata")
 
   private def setStatus(status: String): Unit = {
     logger.info(s"Setting status to '$status' for connection '${connectionName.alias}'")
@@ -174,24 +177,9 @@ case class PubSubConnectionNode(
   
   private lazy val connectionMetadata: Option[PubSubConnectionMetadata] = {
     metadata orElse {
-      logger.info("Metadata is not populated. Fetching from node.")
+      logger.info(s"Metadata is not populated. Fetching from node ${connectionName}.")
       
-      connectionNode flatMap { node =>
-        Option(node.getMetaData[String]())
-      } flatMap { json =>
-        logger.info(s"Metadata from the node: $json")
-        
-        PubSubConnectionMetadata.parse(json) match {
-          case Success(md) => {
-            logger.info(s"Parsed metadata from the node: $md")
-            Some(md)
-          }
-          case Failure(error) => {
-            logger.error("Failed to parse metadata from the node.", error)
-            None
-          }
-        }
-      }
+      getMetadata()
     }
   }
   
@@ -202,21 +190,54 @@ case class PubSubConnectionNode(
       url = connectionMetadata.flatMap(_.url)
     )
   }
+  
+  private def getMetadata(): Option[PubSubConnectionMetadata] = {
+    logger.debug(s"Fetching metadata for connection ${connectionName}")
+    
+    connectionNode flatMap {
+      LinkUtils.getChildNode(_, METADATA_NODE_NAME)
+    } flatMap { child =>
+      Option(child.getValue().getString)
+    } flatMap { json =>
+      logger.debug(s"Metadata for the connection: $json")
+      
+      PubSubConnectionMetadata.parse(json) match {
+        case Success(md) => {
+          logger.debug(s"Fetched metadata for connection ${connectionName}: $md")
+          Some(md)
+        }
+        case Failure(error) => {
+          logger.error(s"Failed to parse metadata for connection ${connectionName}:", error)
+          None
+        }
+      }
+    }
+  }
+  
+  private def setMetadata(metadata: PubSubConnectionMetadata): Unit = {
+    logger.debug(s"Setting metadata for connection ${connectionName}: $metadata")
+    
+    connectionNode foreach { node =>
+      LinkUtils.getOrMakeNode(node, METADATA_NODE_NAME, Some { builder =>
+        builder.setValueType(ValueType.STRING)
+      })
+      .setValue(new Value(metadata.toJson.toString))
+    }
+  }
 
   override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Initializing connection '${connectionName.alias}'")
+    logger.info(s"Initializing connection ${connectionName}")
     
     val CHANNEL_PARAM = "channel"
     val MESSAGE_PARAM = "message"
     
     // Connection node
-    connectionNode = Some(LinkUtils.getOrMakeNode(
-      parentNode, connectionName,
-      Some { builder =>
-        logger.info(s"Writing connection metadata: $connectionMetadata")
-        connectionMetadata foreach { builder setMetaData _.toJson.toString }
-      }
-    ))
+    connectionNode = Option(LinkUtils.getOrMakeNode(parentNode, connectionName))
+    
+    connectionMetadata foreach { metadata =>
+      logger.info(s"Writing connection metadata: $connectionMetadata")
+      setMetadata(metadata)
+    }
     
     connectionNode foreach { cNode =>
       // Status indicator node
@@ -338,7 +359,7 @@ case class PubSubConnectionNode(
       link: DSLink, parentNode: Node, publisherName: PublisherNodeName
   ): Unit = {
     val channel = publisherName.channel
-    logger.info(s"Adding publisher for channel '$channel'")
+    logger.info(s"Adding publisher $publisherName")
     
     connection match {
       case None => {
@@ -347,13 +368,14 @@ case class PubSubConnectionNode(
       }
       case Some(conn) => {
         val publisher = PubSubPublisherNode(parentNode, conn, publisherName)
+
         publisher.linkReady(link) andThen {
           case Success(_) => {
-            logger.info(s"[$connectionName] Succesfully added publisher for channel '$channel'")
+            logger.info(s"Succesfully added publisher $publisherName")
             publishers.put(publisherName.key, publisher)
           }
           case Failure(error) => {
-            logger.error(s"[$connectionName] Error adding publisher for channel '$channel':", error)
+            logger.error(s"Error adding publisher $publisherName:", error)
             publisher.destroy()
           }
         }

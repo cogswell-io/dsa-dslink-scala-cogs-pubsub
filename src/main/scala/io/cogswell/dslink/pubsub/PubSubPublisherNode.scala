@@ -24,26 +24,24 @@ import io.cogswell.dslink.pubsub.model.ActionNodeName
 case class PubSubPublisherNode(
     parentNode: Node,
     connection: PubSubConnection,
-    name: PublisherNodeName
+    publisherName: PublisherNodeName
 )(implicit ec: ExecutionContext) extends PubSubNode {
   private val logger = LoggerFactory.getLogger(getClass)
   private val messageSink: (String) => Unit = { message =>
     connection.publish(channel, message)
   }
   
-  private lazy val channel = name.channel
+  private lazy val channel = publisherName.channel
   private var publisherNode: Option[Node] = None
   
   override def linkReady(link: DSLink)(implicit ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Initializing publisher node for '$channel'")
+    logger.info(s"Initializing publisher $publisherName")
     
     val MESSAGE_PARAM = "message"
-    val nodeName = s"publisher:$channel"
-    val nodeAlias = s"Publisher [$channel]"
     
     // Connection node
     publisherNode = Some(LinkUtils.getOrMakeNode(
-        parentNode, name,
+        parentNode, publisherName,
         Some { _
           .setWritable(Writable.WRITE)
           .setValueType(ValueType.STRING)
@@ -51,6 +49,8 @@ case class PubSubPublisherNode(
     ))
     
     publisherNode foreach { pNode =>
+      logger.info(s"Configuring actions for publisher $publisherName")
+      
       // Handle updates to the 
       pNode.getListener.setValueHandler(new Handler[ValuePair]{
         override def handle(pair: ValuePair): Unit = {
@@ -64,7 +64,7 @@ case class PubSubPublisherNode(
       // Disconnect action node
       LinkUtils.getOrMakeNode(pNode, ActionNodeName("remove-publisher", "Remove Publisher"))
       .setAction(LinkUtils.action(Seq()) { actionData =>
-        logger.info(s"Removing subscriber for channel '$channel'")
+        logger.info(s"Removing publisher $publisherName")
         parentNode.removeChild(pNode)
       })
       

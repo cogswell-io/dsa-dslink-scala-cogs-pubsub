@@ -20,6 +20,7 @@ import org.dsa.iot.dslink.methods.requests.ListRequest
 import org.dsa.iot.dslink.node.NodeBuilder
 import io.cogswell.dslink.pubsub.model.LinkNodeName
 import java.net.URLDecoder
+import java.net.URLEncoder
 
 /**
  * Class representing a parameter attached to an Action.
@@ -135,16 +136,27 @@ object LinkUtils {
       name: LinkNodeName, 
       initializer: Option[(NodeBuilder) => Unit] = None
   ): Node = {
-    Option(parent getChild name.id) getOrElse {
+    getChildNode(parent, name) getOrElse {
       val child = parent createChild name.id setDisplayName name.alias
       initializer foreach (_(child))
       child build
     }
   }
+
+  /**
+   * Node names are URL encoded, so they need to have this encoding applied
+   * before they are used to perform a lookup on a parent node. This function
+   * performs the appropriate encoding.
+   * 
+   * @param nodeName the decoded node name
+   * 
+   * @return the encoded node name
+   */
+  def encodeNodeName(nodeName: String): String = URLEncoder.encode(nodeName, "UTF-8")
   
   /**
    * Node names are URL encoded, so they need to be decoded before we perform any
-   * manipulation based on the name's original content. This functions performs
+   * manipulation based on the name's original content. This function performs
    * the appropriate decoding to restore the name to its original form.
    * 
    * @param nodeName the possibly encoded node name
@@ -170,5 +182,21 @@ object LinkUtils {
     Option(node.getChildren())
     .fold(Map.empty[String, Node])(_.toMap)
     .map(pair => (decodeNodeName(pair._1), pair._2))
+  }
+  
+  /**
+   * Fetches a child node from a node, encoding the id of specified
+   * name before performing the lookup.
+   */
+  def getChildNode(node: Node, childName: LinkNodeName): Option[Node] = {
+    getChildNode(node, childName.id)
+  }
+
+  /**
+   * Fetches a child node from a node, encoding the specified id before
+   * performing the lookup.
+   */
+  def getChildNode(node: Node, childId: String): Option[Node] = {
+    Option(node.getChild(encodeNodeName(childId)))
   }
 }
