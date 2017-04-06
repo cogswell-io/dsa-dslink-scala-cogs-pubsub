@@ -42,8 +42,6 @@ case class PubSubRootNode() extends PubSubNode {
     val manager: NodeManager = link.getNodeManager
     val rootNode = manager.getSuperRoot
     
-    rootNode.setSerializable(false)
-    
     // Connect action
     val NAME_PARAM = "name"
     val URL_PARAM = "url"
@@ -109,35 +107,27 @@ case class PubSubRootNode() extends PubSubNode {
     }
     
     LinkUtils.getOrMakeNode(
-        rootNode, ActionNodeName("add-connection", "Add Connection"),
-        Some { builder =>
-          //builder.setSerializable(false)
-        }
+        rootNode, ActionNodeName("add-connection", "Add Connection")
     ) setAction connectAction
     
     // Synchronize connection nodes with map of nodes.
     {
-      rootNode.getChildren().toMap foreach { case (name, node) =>
-        logger.debug(s"Raw name from key:  ${name}")
-        logger.debug(s"Raw name from node: ${node.getName}")
-      }
-      
       val nodeKeys = LinkUtils.getNodeChildren(rootNode)
       .keySet map { nodeId =>
         logger.debug(s"Assembling name for node '$nodeId'")
-        LinkNodeName.fromNodeId(nodeId)
+        (nodeId, LinkNodeName.fromNodeId(nodeId))
       } map {
         // We are only interested in connection nodes
-        case Some(name: ConnectionNodeName) => {
+        case (nodeId, Some(name: ConnectionNodeName)) => {
           logger.info(s"Connection node found: $name")
           Some(name.key)
         }
-        case Some(name) => {
+        case (nodeId, Some(name)) => {
           logger.info(s"Non-connection node found: $name")
           None
         }
-        case None => {
-          logger.warn("Unrecognized node!")
+        case (nodeId, None) => {
+          logger.warn(s"Unrecognized node '$nodeId'!")
           None
         }
       } filter { _.isDefined } map { _.get }

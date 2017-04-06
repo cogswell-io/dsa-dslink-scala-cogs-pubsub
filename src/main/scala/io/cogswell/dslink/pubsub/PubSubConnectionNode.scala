@@ -81,7 +81,7 @@ case class PubSubConnectionNode(
         keys.map { key =>
           // Identify to which a channel belongs (service, local, or both)
            (key, subscribers.contains(key), subs.contains(key))
-        } foreach {
+        } collect {
           case (key, true, false) => {
             // If a channel is local only, re-subscribe to it. 
             subscribers.get(key).foreach { node =>
@@ -109,7 +109,6 @@ case class PubSubConnectionNode(
               case _ => logger.warn(s"Node name is of the wrong type: ${key}")
             }
           }
-          case _ => // Already in sync; no update needed.
         }
       }
     }
@@ -124,12 +123,11 @@ case class PubSubConnectionNode(
       .map(node => LinkUtils.getNodeChildren(node))
       .fold(Set.empty[String])(_.keySet) map {
         LinkNodeName.fromNodeId(_)
-      } map {
+      } collect {
         // We are only interested in subscriber nodes
-        case Some(subscriberName: SubscriberNodeName) => Some(subscriberName.key)
-        case _ => None
-      } filter { _.isDefined } map { _.get }
-
+        case Some(subscriberName: SubscriberNodeName) => subscriberName.key
+      }
+      
       (nodeKeys ++ subscribers.keySet) map { key =>
         (key.name, nodeKeys.contains(key), subscribers.containsKey(key))
       } foreach {
@@ -154,11 +152,10 @@ case class PubSubConnectionNode(
       .map(node => LinkUtils.getNodeChildren(node))
       .fold(Set.empty[String])(_.keySet) map {
         LinkNodeName.fromNodeId(_)
-      } map {
+      } collect {
         // We are only interested in publisher nodes
-        case Some(publisherName: PublisherNodeName) => Some(publisherName.key)
-        case _ => None
-      } filter { _.isDefined } map { _.get }
+        case Some(publisherName: PublisherNodeName) => publisherName.key
+      }
 
       (nodeKeys ++ subscribers.keySet) map { key =>
         (key.name, nodeKeys.contains(key), subscribers.containsKey(key))
@@ -392,7 +389,7 @@ case class PubSubConnectionNode(
   
   def connect()(implicit ec: ExecutionContext): Future[Unit] = {
     val keys = connectionMetadata.fold(Seq.empty[String]) { m =>
-      Seq(m.readKey, m.writeKey) filter (_.isDefined) map (_.get)
+      Seq(m.readKey, m.writeKey) collect { case Some(key) => key }
     }
     
     Services.pubSubService.connect(keys, Some(connectionOptions)) map { conn =>
