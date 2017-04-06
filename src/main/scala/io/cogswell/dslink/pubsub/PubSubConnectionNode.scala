@@ -136,7 +136,7 @@ case class PubSubConnectionNode(
         case (subscriberName: SubscriberNodeName, false, true) =>
           subscribers.remove(subscriberName.key) foreach { _.destroy() }
         case (subscriberName: SubscriberNodeName, true, false) =>
-          addSubscriber(link, parentNode, subscriberName)
+          connectionNode.foreach { addSubscriber(link, _, subscriberName) }
         case (subscriberName: SubscriberNodeName, true, true) =>
           subscribers(subscriberName.key).linkReady(link)
         case t =>
@@ -166,7 +166,7 @@ case class PubSubConnectionNode(
         case (publisherName: PublisherNodeName, false, true) =>
           subscribers.remove(publisherName.key) foreach { _.destroy() }
         case (publisherName: PublisherNodeName, true, false) =>
-          addPublisher(link, parentNode, publisherName)
+          connectionNode.foreach { addPublisher(link, _, publisherName) }
         case (publisherName: PublisherNodeName, true, true) =>
           subscribers(publisherName.key).linkReady(link)
         case t =>
