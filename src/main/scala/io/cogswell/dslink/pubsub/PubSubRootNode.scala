@@ -118,16 +118,16 @@ case class PubSubRootNode() extends PubSubNode {
         (nodeId, LinkNodeName.fromNodeId(nodeId))
       } map {
         // We are only interested in connection nodes
-        case (nodeId, Some(name: ConnectionNodeName)) => {
+        case (_, Some(name: ConnectionNodeName)) => {
           logger.info(s"Connection node found: $name")
           Some(name.key)
         }
-        case (nodeId, Some(name)) => {
+        case (_, Some(name)) => {
           logger.info(s"Non-connection node found: $name")
           None
         }
-        case (nodeId, None) => {
-          logger.warn(s"Unrecognized node '$nodeId'!")
+        case (nodeId, _) => {
+          logger.warn(s"Could not determine type for node '$nodeId'!")
           None
         }
       } filter { _.isDefined } map { _.get }
