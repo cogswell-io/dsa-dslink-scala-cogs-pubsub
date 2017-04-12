@@ -18,6 +18,7 @@ import io.cogswell.dslink.pubsub.util.LinkUtils
 import org.dsa.iot.dslink.DSLink
 import io.cogswell.dslink.pubsub.model.SubscriberNodeName
 import io.cogswell.dslink.pubsub.model.ActionNodeName
+import io.cogswell.dslink.pubsub.model.InfoNodeName
 
 case class PubSubSubscriberNode(
     parentNode: Node,
@@ -48,6 +49,14 @@ case class PubSubSubscriberNode(
     
     subscriberNode foreach { sNode =>
       logger.info(s"Configuring actions for subscriber $subscriberName")
+      
+      LinkUtils.getOrMakeNode(
+          sNode, InfoNodeName("channel-name", "Channel Name"),
+          Some { builder =>
+            builder.setValueType(ValueType.STRING)
+            builder.setValue(new Value(subscriberName.channel))
+          }
+      )
       
       // Disconnect action node
       LinkUtils.getOrMakeNode(sNode, ActionNodeName("remove-subscriber", "Remove Subscriber"))

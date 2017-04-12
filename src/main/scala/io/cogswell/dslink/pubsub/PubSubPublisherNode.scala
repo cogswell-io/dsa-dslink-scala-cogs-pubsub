@@ -20,6 +20,7 @@ import org.dsa.iot.dslink.DSLink
 import scala.concurrent.Future
 import io.cogswell.dslink.pubsub.model.PublisherNodeName
 import io.cogswell.dslink.pubsub.model.ActionNodeName
+import io.cogswell.dslink.pubsub.model.InfoNodeName
 
 case class PubSubPublisherNode(
     parentNode: Node,
@@ -50,6 +51,14 @@ case class PubSubPublisherNode(
     
     publisherNode foreach { pNode =>
       logger.info(s"Configuring actions for publisher $publisherName")
+
+      LinkUtils.getOrMakeNode(
+          pNode, InfoNodeName("channel-name", "Channel Name"),
+          Some { builder =>
+            builder.setValueType(ValueType.STRING)
+            builder.setValue(new Value(publisherName.channel))
+          }
+      )
       
       // Handle updates to the 
       pNode.getListener.setValueHandler(new Handler[ValuePair]{
